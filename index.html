@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"><meta name="theme-color" content="#101e18">
+<title>Tomato Strike — Combate na estufa</title><link rel="stylesheet" href="style.css"><script src="game.js" defer></script>
+</head>
+<body>
+<main id="arena">
+<canvas id="view" aria-label="Arena em primeira pessoa numa estufa de tomates"></canvas>
+<header><a href="./" class="brand">TOMATO<span>STRIKE</span><small>GREENHOUSE OPERATIONS</small></a><div class="round-label">ESTUFA 01 <span>·</span> <span id="round">RONDA 1 / 3</span></div><button id="pause" aria-label="Pausar jogo">Ⅱ</button></header>
+<div id="combat-hud"><div class="top-stats"><span>ADVERSÁRIOS <b id="enemies">3</b></span><span>ELIMINAÇÕES <b id="kills">0</b></span></div><div class="crosshair" aria-hidden="true"><i></i><i></i><i></i><i></i></div><div id="hit" aria-hidden="true">×</div><div id="hurt" aria-hidden="true"></div><div class="bottom-hud"><div class="health"><small>VIDA</small><strong><span id="health">100</span><em>+</em></strong><div class="health-track"><div id="health-bar"></div></div></div><div id="notice" role="status" aria-live="polite">Mantém-te em movimento.</div><div class="ammo"><small>CESTO DE COMBATE</small><strong><span id="ammo">8</span><em> / 8</em></strong><span class="reload-hint">R · RECARREGAR</span></div></div></div>
+<div id="overlay"><section class="briefing"><p class="eyebrow">FPS · UM JOGADOR CONTRA BOTS</p><h1 id="screen-title">A estufa é tua.<br><em>Defende a colheita.</em></h1><p id="screen-description">Entra na estufa, usa os canteiros como cobertura e elimina a equipa rival com tomates. Três rondas. Uma horta.</p><div class="mission"><span>LOCAL<strong>Estufa de vidro</strong></span><span>ARSENAL<strong>100% tomate</strong></span><span>OBJETIVO<strong>Sobreviver a 3 rondas</strong></span></div><button id="play">Entrar na estufa <span>↗</span></button><div class="controls"><span><kbd>W A S D</kbd> Mover</span><span><kbd>RATO</kbd> Mirar</span><span><kbd>CLIQUE / ESPAÇO</kbd> Arremessar</span><span><kbd>R</kbd> Recarregar</span><span><kbd>ESC / P</kbd> Pausar</span></div><p class="fallback">Move o rato para virar a câmara, sem arrastar. No telemóvel, arrasta a imagem para mirar e usa os controlos no ecrã.</p></section><div class="stamp">CULTIVADO<br>PARA O COMBATE<span>🍅</span></div></div>
+<div id="mobile"><div class="dpad"><button data-key="w" aria-label="Avançar">▲</button><div><button data-key="a" aria-label="Mover à esquerda">◀</button><button data-key="s" aria-label="Recuar">▼</button><button data-key="d" aria-label="Mover à direita">▶</button></div></div><div class="actions"><button id="mobile-reload" aria-label="Recarregar">R</button><button id="mobile-fire">ATIRAR 🍅</button></div></div>
+<div class="version">TOMATO STRIKE / PROTÓTIPO 01 <span>WASD · RATO · CLIQUE · R · ESC</span></div>
+</main>
+</body></html>
