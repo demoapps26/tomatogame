@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="pt">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#16201a" />
+    <meta
+      name="description"
+      content="Tomato Republic: explora a cidade, conduz pelas ruas e constrói o teu império do tomate."
+    />
+    <title>Tomato Republic — A cidade é tua.</title>
+    <link rel="stylesheet" href="style.css" />
+    <script src="game.js" defer></script>
+  </head>
+  <body data-state="menu">
+    <main id="arena">
+      <canvas id="view" aria-label="Mundo 3D de Tomato Republic"></canvas>
+      <section id="menu" aria-label="Menu de Tomato Republic">
+        <header class="menu-header">
+          <a class="brand" href="./" aria-label="Tomato Republic — início"
+            ><span class="brand-symbol" aria-hidden="true"><i></i></span
+            ><span class="brand-wordmark"
+              >TOMATO<small>R E P U B L I C</small></span
+            ></a
+          >
+          <div class="edition">
+            <span class="status-dot"></span> UM NOVO TERRITÓRIO
+            <span class="edition-number">VOL. 01</span>
+          </div>
+        </header>
+        <div class="menu-content">
+          <div class="intro">
+            <p class="eyebrow"><span></span> CULTIVADO PARA A LIBERDADE</p>
+            <h1 id="menu-title">
+              A cidade é tua.<br /><em>Faz crescer o império.</em>
+            </h1>
+            <p id="menu-description">
+              Das ruas à estufa, cada esquina é uma oportunidade. Explora,
+              conduz e conquista o teu lugar num mundo onde o tomate é poder.
+            </p>
+          </div>
+          <div class="territory-heading">
+            <h2>Escolhe o teu território</h2>
+            <span>03 MAPAS · MUNDO EXPLORÁVEL</span>
+          </div>
+          <div class="map-grid" role="group" aria-label="Escolher mapa">
+            <button
+              class="map-card selected"
+              data-map="cidade"
+              type="button"
+              aria-pressed="true"
+            >
+              <span class="map-art city-art" aria-hidden="true"
+                ><span class="art-sun"></span
+                ><span class="city-buildings"></span
+                ><span class="art-road"></span><span class="map-number">01</span
+                ><span class="selected-mark">✓</span></span
+              >
+              <span class="map-info"
+                ><strong>Santa Tomata</strong
+                ><small>Ruas, praças e novas oportunidades</small
+                ><span class="map-tag">CIDADE COSTEIRA</span></span
+              >
+            </button>
+            <button
+              class="map-card"
+              data-map="estufas"
+              type="button"
+              aria-pressed="false"
+            >
+              <span class="map-art farm-art" aria-hidden="true"
+                ><span class="art-sun"></span
+                ><span class="greenhouse greenhouse-one"></span
+                ><span class="greenhouse greenhouse-two"></span
+                ><span class="field-lines"></span
+                ><span class="map-number">02</span
+                ><span class="selected-mark">✓</span></span
+              >
+              <span class="map-info"
+                ><strong>Vale da Colheita</strong
+                ><small>O coração verde do teu império</small
+                ><span class="map-tag">COMPLEXO DE ESTUFAS</span></span
+              >
+            </button>
+            <button
+              class="map-card"
+              data-map="porto"
+              type="button"
+              aria-pressed="false"
+            >
+              <span class="map-art port-art" aria-hidden="true"
+                ><span class="art-sun"></span><span class="port-water"></span
+                ><span class="port-crane"></span><span class="containers"></span
+                ><span class="map-number">03</span
+                ><span class="selected-mark">✓</span></span
+              >
+              <span class="map-info"
+                ><strong>Porto Vermelho</strong
+                ><small>Grandes negócios à beira-mar</small
+                ><span class="map-tag">ZONA PORTUÁRIA</span></span
+              >
+            </button>
+          </div>
+          <div class="launch-row">
+            <button id="play" class="primary-button" type="button">
+              Entrar na cidade <span aria-hidden="true">↗</span>
+            </button>
+            <div class="session-detail">
+              <span class="status-dot"></span
+              ><span
+                >O teu território, ao teu ritmo.<small
+                  >TERCEIRA PESSOA · EXPLORAÇÃO LIVRE</small
+                ></span
+              >
+            </div>
+          </div>
+          <div class="settings" aria-label="Definições do jogo">
+            <label for="quality"
+              ><span>QUALIDADE</span
+              ><select id="quality">
+                <option value="low">Desempenho</option>
+                <option value="medium" selected>Equilibrada</option>
+                <option value="high">Alta</option>
+              </select></label
+            >
+            <label for="sensitivity" class="sensitivity-setting"
+              ><span>SENSIBILIDADE DO RATO</span
+              ><input
+                id="sensitivity"
+                type="range"
+                min="0.5"
+                max="2"
+                step="0.1"
+                value="1"
+                aria-label="Sensibilidade do rato"
+            /></label>
+            <button
+              id="mute"
+              class="sound-button"
+              type="button"
+              aria-label="Ativar ou silenciar o som"
+              aria-pressed="false"
+            >
+              <span aria-hidden="true">♪</span> Som ligado
+            </button>
+          </div>
+        </div>
+        <aside class="world-caption" aria-hidden="true">
+          <span>38° 42′ N · 09° 08′ W</span
+          ><strong>BOAS RAÍZES.<br />GRANDES AMBIÇÕES.</strong>
+          <div></div>
+          <small>HÁ UM MUNDO PARA COLHER.</small>
+        </aside>
+        <footer class="menu-footer">
+          <span>PROTÓTIPO JOGÁVEL · 1 JOGADOR</span
+          ><span>SEM PRESSA. SEM LIMITES PARA A IMAGINAÇÃO.</span
+          ><span class="footer-build">TOMATO REPUBLIC <i>01</i></span>
+        </footer>
+      </section>
+
+      <section id="hud" aria-label="Informação do jogo">
+        <header class="game-header">
+          <div class="hud-brand">TOMATO<span>REPUBLIC</span></div>
+          <div class="location-pill">
+            <span class="status-dot"></span
+            ><span id="location">Santa Tomata</span>
+          </div>
+          <div class="finance">
+            <span id="wanted" aria-label="Nível de alerta">☆☆☆☆☆</span>
+            <div class="cash-balance" aria-label="Saldo em tomates">
+              <span class="currency-mark" aria-hidden="true"><i></i></span
+              ><strong id="cash">0</strong>
+            </div>
+          </div>
+          <button id="pause" type="button" aria-label="Pausar jogo">
+            <span></span><span></span>
+          </button>
+        </header>
+        <div class="mission-card">
+          <div class="mission-heading">
+            <span class="mission-icon" aria-hidden="true">↗</span
+            ><span>O PRÓXIMO PASSO</span><span class="mission-indicator"></span>
+          </div>
+          <h2 id="mission-title">Começa o teu império</h2>
+          <p id="mission-description">
+            Explora a cidade e encontra a tua primeira oportunidade.
+          </p>
+          <div class="mission-progress-line">
+            <span id="mission-progress">0 / 3</span
+            ><small>OBJETIVO ATUAL</small>
+          </div>
+        </div>
+        <div id="crosshair" aria-hidden="true">
+          <i></i><i></i><i></i><i></i><span></span>
+        </div>
+        <div id="damage" aria-hidden="true"></div>
+        <div class="navigation">
+          <div class="minimap-frame">
+            <span class="north-mark" aria-hidden="true">N</span
+            ><canvas
+              id="minimap"
+              width="180"
+              height="180"
+              aria-label="Minimapa do território"
+            ></canvas
+            ><span class="map-coordinate" aria-hidden="true"
+              >SAT · AO VIVO</span
+            >
+          </div>
+          <div class="vital-stats">
+            <div>
+              <span class="stat-icon" aria-hidden="true">+</span
+              ><span>VIDA</span><strong id="health">100</strong>
+            </div>
+          </div>
+        </div>
+        <div id="vehicle-hud" hidden>
+          <strong id="speed">0</strong><span>KM/H</span
+          ><small>E · SAIR DO VEÍCULO</small>
+        </div>
+        <div class="weapon-panel">
+          <span class="weapon-category">ARREMESSO · TOMATE</span>
+          <div class="weapon-ammo">
+            <span class="tomato-icon" aria-hidden="true"><i></i></span
+            ><strong id="ammo">12</strong><span class="ammo-divider">/</span
+            ><span id="reserve">∞</span>
+          </div>
+          <span class="reload-label"><kbd>R</kbd> RECARREGAR</span>
+        </div>
+        <div class="context-panel">
+          <div id="notice" role="status" aria-live="polite"></div>
+          <div id="prompt"></div>
+        </div>
+        <div class="desktop-controls">
+          <span><kbd>W A S D</kbd> Mover</span
+          ><span><kbd>RATO</kbd> Câmara</span
+          ><span><kbd>CLIQUE</kbd> Atirar</span
+          ><span><kbd>E</kbd> Interagir / conduzir</span
+          ><span><kbd>ESPAÇO</kbd> Correr / travão</span
+          ><span><kbd>M</kbd> Mapas</span><span><kbd>ESC</kbd> Pausa</span>
+        </div>
+        <div id="touch-controls" aria-label="Controlos táteis">
+          <div class="touch-pad">
+            <button type="button" data-control="forward" aria-label="Avançar">
+              ▲
+            </button>
+            <div>
+              <button type="button" data-control="left" aria-label="Esquerda">
+                ◀</button
+              ><button
+                type="button"
+                data-control="backward"
+                aria-label="Recuar"
+              >
+                ▼</button
+              ><button type="button" data-control="right" aria-label="Direita">
+                ▶
+              </button>
+            </div>
+          </div>
+          <div class="touch-actions">
+            <button id="touch-reload" type="button" aria-label="Recarregar">
+              R</button
+            ><button
+              id="touch-interact"
+              type="button"
+              aria-label="Interagir ou entrar num veículo"
+            >
+              E</button
+            ><button id="touch-fire" type="button">ATIRAR</button>
+          </div>
+        </div>
+      </section>
+      <noscript
+        ><div class="no-script">
+          Ativa o JavaScript no navegador para entrares em Tomato Republic.
+        </div></noscript
+      >
+    </main>
+  </body>
+</html>

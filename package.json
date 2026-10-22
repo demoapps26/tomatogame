@@ -1,0 +1,19 @@
+{
+  "name": "tomato-republic",
+  "version": "0.2.0",
+  "type": "module",
+  "private": true,
+  "description": "An original single-player tomato action sandbox with three maps, driving and missions",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "node scripts/build.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "start": "node scripts/dev.mjs"
+  },
+  "dependencies": {
+    "three": "0.180.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.10"
+  }
+}
