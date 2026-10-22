@@ -538,7 +538,7 @@ const UPGRADE_DEFS = [
     id: "fleet",
     name: "Frota de distribuição",
     description:
-      "Organização logística que aumenta em 10% os pagamentos de novos contratos.",
+      "Compra a primeira carrinha com motorista para entregas autónomas e aumenta em 10% os pagamentos de novos contratos.",
     cost: 1300,
     max: 1,
     values: { reputation: 5 },
@@ -710,6 +710,109 @@ function endingFor(state, forced = false) {
   };
 }
 
+function normalizeOperationsState(input, company) {
+  const saved = input && typeof input === "object" ? input : {};
+  const rawFleet = Array.isArray(saved.fleet)
+    ? saved.fleet.filter((item) => item && typeof item === "object").slice(0, 3)
+    : [];
+  if (company.upgrades.fleet && !rawFleet.length) rawFleet.push({});
+  if (rawFleet.length) company.upgrades.fleet = 1;
+  const assigned = new Set();
+  const fleet = rawFleet.map((item, index) => {
+    const id = `van-${index + 1}`;
+    const order = company.contracts.find(
+      (contract) => contract.id === item.contractId,
+    );
+    let status = ["outbound", "returning"].includes(item.status)
+      ? item.status
+      : "idle";
+    if (
+      status === "outbound" &&
+      (!order || order.status !== "accepted" || assigned.has(order.id))
+    )
+      status = "idle";
+    if (status === "outbound") {
+      assigned.add(order.id);
+      order.fleetVehicleId = id;
+    }
+    const duration = clamp(finite(item.duration, 45), 1, 300);
+    return {
+      id,
+      name: `Distribuição ${String(index + 1).padStart(2, "0")}`,
+      status,
+      contractId:
+        status === "idle"
+          ? null
+          : typeof item.contractId === "string"
+            ? item.contractId
+            : null,
+      destination:
+        status === "idle"
+          ? null
+          : order?.destination ||
+            (DESTINATION_NAMES[item.destination] ? item.destination : null),
+      duration,
+      remaining:
+        status === "idle"
+          ? 0
+          : clamp(finite(item.remaining, duration), 0, duration),
+      dispatchCost: amount(clamp(finite(item.dispatchCost, 0), 0, 1000)),
+      tripId: Math.max(0, Math.floor(finite(item.tripId, 0))),
+    };
+  });
+  for (const order of company.contracts) {
+    if (order.fleetVehicleId && !assigned.has(order.id))
+      delete order.fleetVehicleId;
+  }
+  const shop = saved.shop && typeof saved.shop === "object" ? saved.shop : {};
+  const greenhouse =
+    saved.greenhouse && typeof saved.greenhouse === "object"
+      ? saved.greenhouse
+      : {};
+  const negotiations = {};
+  if (saved.negotiations && typeof saved.negotiations === "object") {
+    for (const id of ["marta", "rui", "sofia", "artur", "leonor"]) {
+      const negotiation = saved.negotiations[id];
+      if (negotiation && typeof negotiation === "object") {
+        negotiations[id] = {
+          day: Math.round(clamp(finite(negotiation.day, 0), 0, 9999)),
+          contractId:
+            typeof negotiation.contractId === "string"
+              ? negotiation.contractId
+              : "",
+          offerId: ["fair", "premium", "volume"].includes(negotiation.offerId)
+            ? negotiation.offerId
+            : "fair",
+        };
+      }
+    }
+  }
+  return {
+    version: 1,
+    clock: Math.max(0, finite(saved.clock, 0)),
+    fleet,
+    shop: {
+      stock: Math.round(clamp(finite(shop.stock, 0), 0, 120)),
+      sold: Math.max(0, Math.floor(finite(shop.sold, 0))),
+      revenue: amount(Math.max(0, finite(shop.revenue, 0))),
+      elapsed: clamp(finite(shop.elapsed, 0), 0, 8),
+      visitors: Math.max(0, Math.floor(finite(shop.visitors, 0))),
+    },
+    greenhouse: {
+      wateredDay: Math.round(clamp(finite(greenhouse.wateredDay, 0), 0, 9999)),
+      harvestedDay: Math.round(
+        clamp(finite(greenhouse.harvestedDay, 0), 0, 9999),
+      ),
+      lastHarvest: Math.max(0, Math.floor(finite(greenhouse.lastHarvest, 0))),
+      harvested: Math.max(0, Math.floor(finite(greenhouse.harvested, 0))),
+      waterings: Math.max(0, Math.floor(finite(greenhouse.waterings, 0))),
+    },
+    negotiations,
+    fleetDeliveries: Math.max(0, Math.floor(finite(saved.fleetDeliveries, 0))),
+    fleetCosts: amount(Math.max(0, finite(saved.fleetCosts, 0))),
+  };
+}
+
 export function createCompany(name = baseName) {
   const state = {
     version: VERSION,
@@ -751,6 +854,7 @@ export function createCompany(name = baseName) {
     lastReport: null,
   };
   state.contracts = offersFor(state);
+  state.operations = normalizeOperationsState(null, state);
   log(
     state,
     "A chave de Anselmo",
@@ -878,6 +982,7 @@ export function normalizeCompany(saved) {
       ? clone(saved.ending)
       : null;
   boundStats(state);
+  state.operations = normalizeOperationsState(saved.operations, state);
   return state;
 }
 function result(ok, message, state, extra = {}) {
@@ -1090,6 +1195,11 @@ export function deliverContract(input, contractId) {
     contract = state.contracts.find((c) => c.id === contractId);
   if (!contract || contract.status !== "accepted")
     return failure(input, "Não existe uma entrega pendente com esse número.");
+  if (contract.fleetVehicleId)
+    return failure(
+      input,
+      "Esta entrega está atribuída à frota. A carrinha e o motorista estão a tratar do transporte.",
+    );
   if (state.day > contract.deadlineDay)
     return failure(
       input,

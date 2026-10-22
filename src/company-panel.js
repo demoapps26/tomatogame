@@ -6,6 +6,11 @@ import {
   acceptContract,
   buyUpgrade,
 } from "./company.js";
+import {
+  getOperationsView,
+  buyFleetVehicle,
+  dispatchFleet,
+} from "./operations.js";
 const $ = (id) => document.getElementById(id);
 const escape = (value) =>
   String(value ?? "").replace(
@@ -19,7 +24,8 @@ const money = (value) =>
   new Intl.NumberFormat("pt-PT", {
     style: "currency",
     currency: "EUR",
-    maximumFractionDigits: 0,
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 0,
   }).format(Number(value) || 0);
 const readable = (value) =>
   Array.isArray(value)
@@ -37,6 +43,7 @@ export function createCompanyPanel({
   trackContract,
   close,
   notify,
+  navigateToPlace,
 }) {
   let tab = "overview",
     lastReport = null;
@@ -70,7 +77,8 @@ export function createCompanyPanel({
   }
   function render() {
     const company = getCompany(),
-      view = getCompanyView(company);
+      view = getCompanyView(company),
+      operations = getOperationsView(company);
     const reportToShow = lastReport || company.lastReport;
     $("company-title").textContent = company.name;
     const initials = company.name
@@ -104,6 +112,10 @@ export function createCompanyPanel({
     ];
     $("company-summary").innerHTML =
       `<article class="company-card"><span class="company-tag">${escape(view.chapterLabel)}</span><h3>${escape(view.title)}</h3><p>${escape(view.objective)}</p>${view.ending ? `<div class="company-ending"><h4>${escape(view.ending.title || view.ending.name || "O legado da tua empresa")}</h4><p>${escape(view.ending.body || view.ending.description || view.ending.text || readable(view.ending))}</p></div>` : ""}</article><div class="company-grid">${metrics.map(([name, value]) => `<div class="company-metric"><span>${escape(name)}</span><strong>${escape(value)}</strong></div>`).join("")}</div><article class="company-card"><h3>O tempo é uma decisão.</h3><p>Encerrar o dia produz uma nova colheita e paga salários, manutenção e juros. Os contratos têm prazo. As tuas escolhas alteram a qualidade, as relações e o rumo da história.</p>${reportToShow ? `<div class="company-day-report" role="status">${escape(describeReport(reportToShow))}</div>` : ""}</article>`;
+    $("company-summary").insertAdjacentHTML(
+      "beforeend",
+      `<article class="company-card company-field-card"><span class="company-tag">A EMPRESA ACONTECE LÁ FORA</span><h3>Conhece o teu negócio de perto.</h3><p>Entra na loja, rega e colhe na estufa, visita os clientes e acompanha as carrinhas no terreno. Aproxima-te e usa E para interagir.</p><div class="company-field-stats"><span><b>${operations.shop.stock}</b> caixas na loja</span><span><b>${operations.fleet.length}</b> carrinhas próprias</span><span><b>${operations.shop.sold}</b> caixas vendidas</span></div>${navigateToPlace ? `<div class="company-inline-actions"><button class="company-action secondary" data-action="visit" data-id="shop-counter">Visitar a loja</button><button class="company-action secondary" data-action="visit" data-id="greenhouse-water">Ir à estufa</button><button class="company-action secondary" data-action="visit" data-id="fleet-depot">Ver a frota</button><button class="company-action secondary" data-action="visit" data-id="rui">Conhecer um cliente</button></div>` : ""}</article>`,
+    );
     const event = view.event;
     $("company-story").innerHTML =
       `<article class="company-card"><span class="company-tag">${escape(view.mentor || "Marta · Administradora da cooperativa")}</span><h3>${escape(event?.title || view.title)}</h3><p class="company-dialogue">${escape(view.dialogue || event?.body || view.objective)}</p>${event?.body && event.body !== view.dialogue ? `<p>${escape(event.body)}</p>` : ""}</article>${(view.decisions || []).map((decision) => `<article class="company-choice"><h3>${escape(decision.label)}</h3><p>${escape(decision.description)}</p><div class="company-choice-effects">${escape(readable(decision.effects))}</div><button class="company-action" data-action="decision" data-id="${escape(decision.id)}" ${decision.disabled || !isFounded() ? "disabled" : ""}>${escape(decision.disabled ? decision.reason || "Requisitos em falta" : "Escolher este caminho")}</button></article>`).join("") || `<article class="company-card"><p>${escape(view.ending ? "A tua história ficou registada. Podes continuar a gerir a empresa e a explorar a cidade." : "Continua as entregas e avança para o próximo dia para descobrir o que acontece.")}</p></article>`}`;
@@ -115,7 +127,7 @@ export function createCompanyPanel({
       universidade: "Universidade Agrícola",
     };
     $("company-contracts").innerHTML =
-      `<article class="company-card"><h3>Da tua colheita para a cidade.</h3><p>Aceitar reserva as caixas. Para receberes, segue o marcador, conduz até ao cliente e carrega em E. As entregas são feitas em Santa Tomata.</p></article><div class="company-grid">${(
+      `<article class="company-card"><h3>Da tua colheita para a cidade.</h3><p>Aceitar reserva as caixas. Entrega pessoalmente no destino com E ou atribui uma carrinha disponível. Na cidade, conversa com os clientes para negociar novas encomendas.</p></article><div class="company-grid">${(
         view.contracts || []
       )
         .map((contract) => {
@@ -125,11 +137,19 @@ export function createCompanyPanel({
             finished = ["delivered", "completed", "expired", "failed"].includes(
               contract.status,
             );
-          return `<article class="company-card"><span class="company-tag">${escape(contract.status === "delivered" ? "ENTREGUE" : accepted ? "EM TRANSPORTE" : contract.status === "expired" ? "PRAZO TERMINADO" : "CONTRATO DISPONÍVEL")}</span><h3>${escape(contract.title)}</h3><p>${escape(destinations[contract.destination] || contract.destination)} · ${escape(contract.quantity)} caixas</p><strong class="company-contract-value">${escape(money(contract.payment))}</strong><p>Entregar até ao dia ${escape(contract.deadlineDay)}.</p>${!finished ? `<button class="company-action" data-action="${accepted ? "track" : "accept"}" data-id="${escape(contract.id)}" ${!isFounded() || contract.disabled ? "disabled" : ""}>${accepted ? "Seguir entrega no mapa" : "Aceitar e preparar entrega"}</button>` : ""}${contract.reason ? `<small>${escape(contract.reason)}</small>` : ""}</article>`;
+          const assigned = contract.fleetVehicleId,
+            freeVehicle = operations.fleet.some(
+              (vehicle) => vehicle.status === "idle",
+            );
+          return `<article class="company-card"><span class="company-tag">${escape(contract.status === "delivered" ? "ENTREGUE" : assigned ? "FROTA EM DISTRIBUIÇÃO" : accepted ? "CARGA PREPARADA" : contract.status === "expired" ? "PRAZO TERMINADO" : "CONTRATO DISPONÍVEL")}</span><h3>${escape(contract.title)}</h3><p>${escape(destinations[contract.destination] || contract.destination)} · ${escape(contract.quantity)} caixas</p><strong class="company-contract-value">${escape(money(contract.payment))}</strong><p>Entregar até ao dia ${escape(contract.deadlineDay)}.</p>${!finished && !assigned ? `<button class="company-action" data-action="${accepted ? "track" : "accept"}" data-id="${escape(contract.id)}" ${!isFounded() || contract.disabled ? "disabled" : ""}>${accepted ? "Entregar pessoalmente" : "Aceitar e preparar entrega"}</button>${accepted ? `<button class="company-action secondary" data-action="dispatch" data-id="${escape(contract.id)}" ${!isFounded() || !freeVehicle ? "disabled" : ""}>${freeVehicle ? "Enviar com a frota · " + money(12 + contract.quantity * 0.2) : operations.fleet.length ? "Carrinhas ocupadas" : "Adquire uma carrinha no depósito"}</button>` : ""}` : assigned ? `<p class="company-fleet-note">A carrinha está a fazer esta entrega. O pagamento entra quando chegar ao cliente.</p>` : ""}${contract.reason ? `<small>${escape(contract.reason)}</small>` : ""}</article>`;
         })
         .join("")}</div>`;
     $("company-upgrades").innerHTML =
       `<article class="company-card"><h3>Investir muda o futuro.</h3><p>Expande a produção, protege a equipa e decide como a tua empresa cresce. Os investimentos alteram custos e resultados dos próximos dias.</p></article><div class="company-grid">${(view.upgrades || []).map((upgrade) => `<article class="company-card"><span class="company-tag">${upgrade.owned ? "NÍVEL " + upgrade.owned + " / " + upgrade.max : "INVESTIMENTO"}</span><h3>${escape(upgrade.name)}</h3><p>${escape(upgrade.description)}</p><strong class="company-contract-value">${escape(money(upgrade.cost))}</strong><button class="company-action secondary" data-action="upgrade" data-id="${escape(upgrade.id)}" ${upgrade.disabled || !isFounded() ? "disabled" : ""}>${escape(upgrade.owned >= upgrade.max ? "Nível máximo" : upgrade.disabled ? upgrade.reason || "Indisponível" : "Investir")}</button></article>`).join("")}</div>`;
+    $("company-upgrades").insertAdjacentHTML(
+      "afterbegin",
+      `<article class="company-card"><span class="company-tag">LOGÍSTICA PRÓPRIA · ${operations.fleet.length} / ${operations.fleetMax}</span><h3>As tuas carrinhas, a trabalhar.</h3><p>Reserva um contrato e atribui uma carrinha. Ela sai do depósito, faz a entrega e regressa. Combustível e motorista têm um custo por serviço; o tempo passa enquanto exploras.</p><div class="company-fleet-grid">${operations.fleet.map((vehicle) => `<div class="company-fleet-unit"><strong>${escape(vehicle.name)}</strong><span>${vehicle.status === "idle" ? "No depósito · disponível" : vehicle.status === "returning" ? "A regressar ao depósito" : "A caminho do cliente"}</span>${vehicle.status !== "idle" ? `<progress value="${Math.max(0, Math.min(1, Number(vehicle.progress) || 0))}" max="1" aria-label="Progresso da carrinha"></progress><small>${Math.ceil(vehicle.remaining)} s até ${vehicle.status === "returning" ? "regressar" : "entregar"}</small>` : ""}</div>`).join("") || `<p>Ainda não tens carrinhas próprias. Podes continuar a entregar pessoalmente.</p>`}</div><button class="company-action" data-action="buy-fleet" ${!isFounded() || !operations.canBuyFleet ? "disabled" : ""}>${operations.fleet.length >= operations.fleetMax ? "Frota completa" : `Comprar carrinha · ${escape(money(operations.fleetCost))}`}</button>${operations.fleetReason ? `<small>${escape(operations.fleetReason)}</small>` : ""}</article>`,
+    );
     const history = (company.history || []).slice(-40).reverse();
     $("company-ledger").innerHTML =
       `<article class="company-card"><h3>O diário da tua empresa.</h3><p>As decisões, as entregas e os resultados dos dias ficam registados na tua campanha.</p></article><ol class="company-history">${history.map((item) => `<li><span class="company-tag">DIA ${escape(item.day || company.day)}</span><p>${escape(typeof item === "string" ? item : item.body || item.text || item.message || item.description || item.title || readable(item))}</p>${Number.isFinite(item.amount) ? `<strong>${escape(money(item.amount))}</strong>` : ""}</li>`).join("") || "<li>A tua história começa hoje.</li>"}</ol>`;
@@ -180,6 +200,12 @@ export function createCompanyPanel({
     if (action === "decision" && apply(applyDecision(current, id)))
       $("company-panel").querySelector(".company-main").scrollTop = 0;
     if (action === "upgrade") apply(buyUpgrade(current, id));
+    if (action === "buy-fleet") apply(buyFleetVehicle(current));
+    if (action === "dispatch") apply(dispatchFleet(current, id));
+    if (action === "visit" && navigateToPlace) {
+      close();
+      navigateToPlace(id);
+    }
     if (action === "accept" && apply(acceptContract(current, id))) {
       trackContract(id);
       close();

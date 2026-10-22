@@ -16,6 +16,10 @@ import {
 import { createCompanyPanel } from "./company-panel.js";
 import { createCityLife } from "./life.js";
 import { createVisuals } from "./graphics.js";
+import { advanceOperations, getOperationsView } from "./operations.js";
+import { createDrivingCamera } from "./driving-camera.js";
+import { createFleet } from "./fleet.js";
+import { createVenues } from "./venues.js";
 
 const $ = (id) => document.getElementById(id);
 const canvas = $("view");
@@ -67,7 +71,7 @@ const camera = new THREE.PerspectiveCamera(
   58,
   innerWidth / innerHeight,
   0.12,
-  1800,
+  2200,
 );
 const visuals = createVisuals(renderer, scene, camera, settings.quality);
 let savedCampaign = null;
@@ -81,8 +85,13 @@ let company = normalizeCompany(savedCampaign?.company || createCompany());
 let companyView = getCompanyView(company),
   founded = !!savedCampaign?.founded;
 let activeContractId = savedCampaign?.activeContractId || null,
+  placeTargetId = savedCampaign?.placeTargetId || null,
   companyPanel = null,
-  life = null;
+  life = null,
+  fleet = null,
+  venues = null;
+const drivingCamera = createDrivingCamera();
+let operationsTime = 0;
 let renderDirty = true;
 let replacingCampaign = false;
 let initialized = false,
@@ -250,7 +259,11 @@ function hitBox(x, z, radius = 0.35, height = null) {
   );
 }
 function carAt(x, z, radius = 0.35, ignore = null) {
-  for (const car of [...cars, ...(life?.vehicles || [])]) {
+  for (const car of [
+    ...cars,
+    ...(life?.vehicles || []),
+    ...(fleet?.vehicles || []),
+  ]) {
     if (
       car === ignore ||
       Math.abs(x - car.position.x) > 5 + radius ||
@@ -335,6 +348,7 @@ function currentContract() {
     company.contracts?.find(
       (contract) =>
         contract.id === activeContractId &&
+        !contract.fleetVehicleId &&
         ["accepted", "active", "reserved"].includes(contract.status),
     ) || null
   );
@@ -348,7 +362,11 @@ function questPoint() {
   const contract = currentContract();
   if (contract)
     return mapId === "cidade" ? businessLocation(contract.destination) : null;
-  return businessLocation("sede");
+  return (
+    (placeTargetId &&
+      world.interactionPoints?.find((point) => point.id === placeTargetId)) ||
+    businessLocation("sede")
+  );
 }
 function saveCampaign() {
   if (!initialized || replacingCampaign) return;
@@ -365,6 +383,7 @@ function saveCampaign() {
       yaw,
       pitch,
       activeContractId,
+      placeTargetId,
       lastStoryEvent,
       vehicles: cars.map((car) => ({
         x: car.position.x,
@@ -396,6 +415,8 @@ function changeCompany(next) {
       world.bounds,
       world.navigationCellSize || 3,
     );
+  fleet?.sync(company);
+  venues?.refresh();
   updateMission();
   updateHud();
   saveCampaign();
@@ -429,9 +450,11 @@ function trackContract(id) {
   const contract = company.contracts?.find(
     (item) =>
       item.id === id &&
+      !item.fleetVehicleId &&
       ["accepted", "active", "reserved"].includes(item.status),
   );
   if (!contract) return;
+  placeTargetId = null;
   activeContractId = id;
   if (mapId !== "cidade") resetMap("cidade");
   const point = questPoint();
@@ -439,6 +462,23 @@ function trackContract(id) {
   routeTime = 4;
   notify(
     "Entrega marcada. Segue a rota dourada no minimapa e carrega em E no destino.",
+    6,
+  );
+  updateMission();
+  saveCampaign();
+}
+function navigateToPlace(id) {
+  if (mapId !== "cidade") resetMap("cidade");
+  const place = world.interactionPoints?.find((point) => point.id === id);
+  if (!place) return;
+  activeContractId = null;
+  placeTargetId = id;
+  route = navigation.findPath(player.position, place);
+  routeTime = 4;
+  if (state === "company") closeCompany();
+  else if (state === "venue") venues?.close();
+  notify(
+    `Segue a rota até ${place.label}. Aproxima-te a pé e carrega em E.`,
     6,
   );
   updateMission();
@@ -496,6 +536,10 @@ function resetMap(id) {
   if (marker) clearGroup(marker);
   life?.dispose();
   life = null;
+  fleet?.dispose();
+  fleet = null;
+  venues?.dispose();
+  venues = null;
   world?.dispose();
   mapId = MAPS.some((map) => map.id === id) ? id : "cidade";
   world = buildWorld(scene, mapId, settings.quality);
@@ -515,6 +559,7 @@ function resetMap(id) {
   player.actor.group.rotation.y = player.yaw;
   yaw = 0;
   pitch = 0.24;
+  drivingCamera.reset(yaw);
   wanted = 0;
   quietTime = 0;
   patrolTime = 0;
@@ -539,6 +584,30 @@ function resetMap(id) {
     .slice(0, 6)
     .forEach((spawn, index) => addEnemy(spawn, index));
   life = createCityLife(scene, world, settings.quality);
+  if (mapId === "cidade") {
+    fleet = createFleet(scene, world, settings.quality);
+    fleet.sync(company);
+  }
+  venues = createVenues({
+    scene,
+    world,
+    getCompany: () => company,
+    setCompany: changeCompany,
+    notify,
+    isFounded: () => founded,
+    trackContract,
+    onStateChange(open) {
+      if (transitioning) return;
+      if (open) {
+        setState("venue");
+        $("story-toast").hidden = true;
+      } else if (state === "venue") {
+        setState("playing");
+        last = performance.now();
+        saveCampaign();
+      }
+    },
+  });
   route = [];
   routeTime = 0;
   makeMarker();
@@ -570,17 +639,23 @@ function updateMission() {
     : 0;
   $("mission-title").textContent = contract
     ? contract.title
-    : companyView.event?.title || companyView.title;
+    : placeTargetId && point
+      ? point.label
+      : companyView.event?.title || companyView.title;
   $("mission-description").textContent = remoteContract
     ? "Esta entrega é feita em Santa Tomata. Abre B Empresa → Contratos e escolhe «Seguir entrega no mapa» para regressar à cidade e retomar a rota."
     : contract
       ? `Leva ${contract.quantity} caixas a ${point?.name || contract.destination}. Recebes ${Math.round(contract.payment)} € após a entrega.`
-      : companyView.objective;
+      : placeTargetId && point
+        ? "Vai ao local, sai do veículo e aproxima-te para interagir com E. A loja, a estufa e os clientes fazem parte da tua empresa."
+        : "Explora a loja e a estufa junto à sede. Fala com os clientes, negoceia encomendas e investe na tua frota. B abre a empresa e marca os destinos.";
   $("mission-progress").textContent = remoteContract
     ? `RETOMAR EM SANTA TOMATA · DIA ${contract.deadlineDay}`
     : contract
       ? `ENTREGAR · ${distance} m · DIA ${contract.deadlineDay}`
-      : `${companyView.chapterLabel} · B EMPRESA`;
+      : placeTargetId && point
+        ? `VISITAR · ${distance} m · E INTERAGIR`
+        : `${companyView.chapterLabel} · B EMPRESA`;
 }
 function reward(amount, text) {
   company = { ...company, cash: company.cash + amount };
@@ -619,6 +694,8 @@ function missionAction() {
 }
 function interact() {
   if (state !== "playing") return;
+  if (currentContract() && mapId === "cidade" && missionAction()) return;
+  if (!player.vehicle && venues?.interact()) return;
   if (missionAction()) return;
   if (player.vehicle) {
     const car = player.vehicle;
@@ -656,6 +733,7 @@ function interact() {
       player.actor.group.visible = false;
       player.position.copy(car.position);
       yaw = car.yaw - Math.PI;
+      drivingCamera.reset(yaw);
       notify("W acelera · S trava/recua · A/D vira · Espaço trava · E sai.", 5);
     }
   }
@@ -684,7 +762,7 @@ function setState(next) {
   state = next;
   renderDirty = true;
   document.body.dataset.state = next;
-  $("hud").inert = next === "company";
+  $("hud").inert = next === "company" || next === "venue";
   keys.clear();
   fireHeld = false;
   dragging = false;
@@ -698,6 +776,7 @@ function setState(next) {
     if (document.pointerLockElement === canvas) document.exitPointerLock();
   }
   if (next !== "company") $("company-panel").hidden = true;
+  if (next !== "venue" && venues?.isOpen()) venues.close();
   if (audio.motorGain)
     audio.motorGain.gain.setTargetAtTime(0, audio.context.currentTime, 0.05);
 }
@@ -1139,13 +1218,23 @@ function updateQuests(dt) {
   else if (cars.some((c) => c.position.distanceTo(player.position) < 4.2))
     prompt = "E · Conduzir";
   else if (remoteContract) prompt = "B · Empresa → Contratos → Retomar entrega";
+  const nearby = !player.vehicle && venues?.nearest();
+  if (
+    nearby &&
+    !(
+      contract &&
+      point &&
+      Math.hypot(player.position.x - point.x, player.position.z - point.z) <= 6
+    )
+  )
+    prompt = `E · ${nearby.label}`;
   $("prompt").textContent = prompt;
   $("prompt").hidden = !prompt;
   routeTime -= dt;
   if (remoteContract) {
     route = [];
     routeTime = 0;
-  } else if (contract && point && routeTime <= 0) {
+  } else if ((contract || placeTargetId) && point && routeTime <= 0) {
     route = navigation.findPath(player.position, point);
     routeTime = 5;
   }
@@ -1166,10 +1255,31 @@ function updateQuests(dt) {
   }
 }
 function cameraUpdate(dt, instant = false) {
+  let chase = null;
+  if (player.vehicle) {
+    if (instant) drivingCamera.reset(yaw);
+    chase = drivingCamera.update(dt, {
+      carYaw: player.vehicle.yaw,
+      speed: player.vehicle.speed,
+      orbitYaw: yaw,
+      pitch,
+    });
+    yaw = chase.yaw;
+    pitch = chase.pitch;
+  }
+  const indoors =
+    !player.vehicle &&
+    world?.interiorZones?.some(
+      (zone) =>
+        player.position.x >= zone.minX &&
+        player.position.x <= zone.maxX &&
+        player.position.z >= zone.minZ &&
+        player.position.z <= zone.maxZ,
+    );
   lookTarget.copy(player.position);
-  lookTarget.y = player.vehicle ? 1.5 : 1.35;
-  const distance = player.vehicle ? 9 : 5.4,
-    shoulder = player.vehicle ? 0.2 : 0.65;
+  lookTarget.y = chase?.height || 1.35;
+  const distance = chase?.distance || (indoors ? 3.2 : 5.4),
+    shoulder = player.vehicle ? 0.12 : indoors ? 0.3 : 0.65;
   cameraDesired.set(
     player.position.x +
       Math.sin(yaw) * Math.cos(pitch) * distance +
@@ -1196,6 +1306,10 @@ function cameraUpdate(dt, instant = false) {
     }
   }
   cameraTarget.copy(lookTarget);
+  if (chase) {
+    cameraTarget.x += Math.sin(player.vehicle.yaw) * chase.targetAhead;
+    cameraTarget.z += Math.cos(player.vehicle.yaw) * chase.targetAhead;
+  }
   cameraTarget.x += Math.cos(yaw) * shoulder;
   cameraTarget.z -= Math.sin(yaw) * shoulder;
   if (instant) camera.position.copy(cameraDesired);
@@ -1326,6 +1440,28 @@ function update(dt) {
   }
   if (fireHeld) shoot();
   updatePlayer(dt);
+  venues?.update(dt, player.position, !!player.vehicle);
+  if (founded) operationsTime += dt;
+  else operationsTime = 0;
+  if (founded && operationsTime >= 1) {
+    const result = advanceOperations(company, operationsTime, {
+      pausedFleetIds: (fleet?.vehicles || [])
+        .filter((vehicle) => vehicle.blocked)
+        .map((vehicle) => vehicle.id),
+    });
+    operationsTime = 0;
+    if (result.ok) {
+      company = result.state;
+      companyView = getCompanyView(company);
+      fleet?.sync(company);
+      if (result.events?.length) {
+        notify(result.events.at(-1), 6);
+        venues?.refresh();
+        saveCampaign();
+      }
+    }
+  }
+  fleet?.update(dt, player.position, [...cars, ...(life?.vehicles || [])]);
   life?.update(dt, player.position);
   for (const car of cars)
     car.actor.group.visible =
@@ -1391,6 +1527,7 @@ function resize() {
   visuals.resize(innerWidth, innerHeight);
 }
 function look(dx, dy) {
+  if (player.vehicle) drivingCamera.noteManualLook();
   yaw -= dx * 0.0025 * settings.sensitivity;
   pitch = THREE.MathUtils.clamp(
     pitch + dy * 0.0025 * settings.sensitivity,
@@ -1485,6 +1622,10 @@ addEventListener("keydown", (event) => {
   }
   if (event.target.closest?.("input,textarea,select") && key !== "escape")
     return;
+  if (state === "venue") {
+    if (key === "escape" || key === "b") venues?.close();
+    return;
+  }
   if (state === "company") {
     if (key === "escape" || key === "b") closeCompany();
     return;
@@ -1603,6 +1744,7 @@ companyPanel = createCompanyPanel({
     saveCampaign();
   },
   trackContract,
+  navigateToPlace,
   close: closeCompany,
   notify,
 });
@@ -1618,6 +1760,8 @@ $("new-campaign").addEventListener("click", () => {
   companyView = getCompanyView(company);
   founded = false;
   activeContractId = null;
+  placeTargetId = null;
+  operationsTime = 0;
   lastStoryEvent = "";
   started = false;
   savedCampaign = null;
@@ -1641,6 +1785,7 @@ $("export-save").addEventListener("click", () => {
     yaw,
     pitch,
     activeContractId,
+    placeTargetId,
     lastStoryEvent,
     vehicles: cars.map((c) => ({
       x: c.position.x,
@@ -1780,6 +1925,26 @@ if (new URLSearchParams(location.search).has("diagnostics")) {
         company: JSON.parse(JSON.stringify(company)),
         founded,
         activeContractId,
+        placeTargetId,
+        nearbyPlace: venues?.nearest()?.id || null,
+        operations: getOperationsView(company),
+        fleet: (fleet?.vehicles || []).map((vehicle) => ({
+          id: vehicle.id,
+          x: vehicle.position.x,
+          z: vehicle.position.z,
+          yaw: vehicle.yaw,
+          speed: vehicle.speed,
+          blocked: !!vehicle.blocked,
+          routeUnavailable: !!vehicle.routeUnavailable,
+        })),
+        interactionPoints: (world.interactionPoints || []).map((point) => ({
+          ...point,
+        })),
+        cameraPosition: {
+          x: camera.position.x,
+          y: camera.position.y,
+          z: camera.position.z,
+        },
         locations: (world.businessLocations || []).map((item) => ({ ...item })),
         districts: (world.districts || []).map((item) => ({ ...item })),
         worldStats: { ...world.stats },

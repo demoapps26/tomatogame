@@ -33,10 +33,10 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
   const config = MAPS.find((map) => map.id === mapId) || MAPS[0];
   const city = config.id === "cidade",
     farm = config.id === "estufas";
-  const half = city ? 510 : 250,
+  const half = city ? 730 : 250,
     roadStep = 96,
     roadLines = [];
-  for (let p = -(city ? 480 : 192); p <= (city ? 480 : 192); p += roadStep)
+  for (let p = -(city ? 672 : 192); p <= (city ? 672 : 192); p += roadStep)
     roadLines.push(p);
   const bounds = { minX: -half, maxX: half, minZ: -half, maxZ: half };
   const group = new THREE.Group();
@@ -44,7 +44,10 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
   const colliders = [],
     roads = [],
     districts = [],
-    businessLocations = [];
+    businessLocations = [],
+    interactionPoints = [],
+    interiorZones = [],
+    interiorRoofs = [];
   const locationSigns = new Map();
   const geometries = new Set(),
     materials = new Set(),
@@ -349,6 +352,54 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
       roughness: 0.4,
     }),
   };
+  // Alpha-tested leaf clusters give crowns a broken natural silhouette instead
+  // of solid low-poly balls. One atlas and a handful of cards are shared by all
+  // trees; near/far spatial culling remains the same as other foliage.
+  const leafCanvas = document.createElement("canvas");
+  leafCanvas.width = leafCanvas.height = 256;
+  const leafContext = leafCanvas.getContext("2d"),
+    leafImage = leafContext.createImageData(256, 256);
+  for (let leaf = 0; leaf < 84; leaf++) {
+    const angle = leaf * 2.39996323,
+      radius = Math.sqrt((leaf + 0.4) / 84) * 0.43;
+    const cx = 0.5 + Math.cos(angle) * radius,
+      cy = 0.5 + Math.sin(angle) * radius * 0.85;
+    const yaw = leaf * 1.73,
+      cs = Math.cos(yaw),
+      sn = Math.sin(yaw);
+    const rx = 0.047 + (leaf % 5) * 0.004,
+      ry = 0.019 + (leaf % 3) * 0.004;
+    for (
+      let py = Math.max(0, Math.floor((cy - rx) * 256));
+      py < Math.min(256, Math.ceil((cy + rx) * 256));
+      py++
+    )
+      for (
+        let px = Math.max(0, Math.floor((cx - rx) * 256));
+        px < Math.min(256, Math.ceil((cx + rx) * 256));
+        px++
+      ) {
+        const dx = px / 256 - cx,
+          dy = py / 256 - cy,
+          u = (dx * cs + dy * sn) / rx,
+          v = (-dx * sn + dy * cs) / ry;
+        if (u * u + v * v > 1) continue;
+        const index = (py * 256 + px) * 4,
+          tone = 0.77 + (leaf % 7) * 0.035 + Math.max(0, -v) * 0.08;
+        leafImage.data[index] = 202 * tone;
+        leafImage.data[index + 1] = 217 * tone;
+        leafImage.data[index + 2] = 178 * tone;
+        leafImage.data[index + 3] = 255;
+      }
+  }
+  leafContext.putImageData(leafImage, 0, 0);
+  const leafMap = canvasTexture(leafCanvas);
+  leafMap.wrapS = leafMap.wrapT = THREE.ClampToEdgeWrapping;
+  mats.foliage.map = leafMap;
+  mats.foliage.color.set("#ffffff");
+  mats.foliage.alphaTest = 0.45;
+  mats.foliage.side = THREE.DoubleSide;
+  const leafCardGeo = geometry(new THREE.PlaneGeometry(1, 1));
   // World-space triplanar colour prevents a metre of plaster or asphalt from
   // stretching over an entire instanced tower. This also removes visible UV
   // seams between neighbouring street segments.
@@ -592,36 +643,40 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
       ? choose(["#6a7957", "#7c8667", "#596e4c"])
       : choose(["#53734c", "#718452", "#5f7746"]);
     detailLevel = 2;
-    orb(
-      mats.foliage,
-      x,
-      5.2 * size,
-      z,
-      2.25 * size,
-      olive ? 1.7 * size : 2.7 * size,
-      2.0 * size,
-      tone,
-    );
-    orb(
-      mats.foliage,
-      x + 1.2 * size,
-      4.65 * size,
-      z - 0.8 * size,
-      1.55 * size,
-      1.65 * size,
-      1.5 * size,
-      tone,
-    );
-    orb(
-      mats.foliage,
-      x - 1.15 * size,
-      4.75 * size,
-      z + 0.7 * size,
-      1.65 * size,
-      1.65 * size,
-      1.6 * size,
-      tone,
-    );
+    for (const [dx, dy, dz, sx, sy] of [
+      [0, 5.3, 0, 5.6, olive ? 3.8 : 5.6],
+      [1.15, 4.7, -0.75, 4.1, 3.5],
+      [-1.05, 4.8, 0.7, 4.2, 3.6],
+    ]) {
+      for (const yaw of [0, Math.PI / 3, (Math.PI * 2) / 3])
+        instance(
+          leafCardGeo,
+          mats.foliage,
+          x + dx * size,
+          dy * size,
+          z + dz * size,
+          sx * size,
+          sy * size,
+          1,
+          yaw,
+          tone,
+          0,
+          (dx + dz) * 0.15,
+        );
+      instance(
+        leafCardGeo,
+        mats.foliage,
+        x + dx * size,
+        (dy + 0.4) * size,
+        z + dz * size,
+        sx * size,
+        sx * size,
+        1,
+        dx,
+        tone,
+        -Math.PI / 2,
+      );
+    }
     detailLevel = 0;
     collision(x, z, 0.6 * size, 0.6 * size, 5 * size);
   }
@@ -700,26 +755,52 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
   }
   function crop(x, z, size = 1) {
     cyl(mats.wood, x, 1.2 * size, z, 0.035, 2.4 * size);
-    orb(
+    // Visible stems, broken leaf silhouettes and fruit along a trellis.
+    beam(
       mats.leaf,
       x,
-      0.95 * size,
-      z,
-      0.4 * size,
       0.7 * size,
-      0.38 * size,
-      "#4f693b",
+      z,
+      x + 0.1 * size,
+      2.2 * size,
+      z - 0.05 * size,
+      0.026 * size,
     );
-    orb(
-      mats.leaf,
-      x + 0.15 * size,
-      1.55 * size,
-      z - 0.08 * size,
-      0.37 * size,
-      0.55 * size,
-      0.33 * size,
-      "#658348",
-    );
+    for (const side of [-1, 1]) {
+      beam(
+        mats.leaf,
+        x,
+        1.2 * size,
+        z,
+        x + side * 0.38 * size,
+        1.55 * size,
+        z + 0.12 * size,
+        0.018 * size,
+      );
+      beam(
+        mats.leaf,
+        x + 0.1 * size,
+        1.7 * size,
+        z,
+        x + side * 0.33 * size,
+        2 * size,
+        z - 0.15 * size,
+        0.014 * size,
+      );
+    }
+    for (const yaw of [0, Math.PI / 3, (Math.PI * 2) / 3])
+      instance(
+        leafCardGeo,
+        mats.foliage,
+        x,
+        1.5 * size,
+        z,
+        1.28 * size,
+        2.08 * size,
+        1,
+        yaw,
+        "#66864d",
+      );
     instance(
       sphereGeo,
       mats.tomato,
@@ -1294,10 +1375,11 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
   for (const coordinate of roadLines) {
     const width = roadWidth(coordinate);
     for (const horizontal of [false, true]) {
-      const g = roadSurface(width, 96);
-      for (let center = -half + 48; center < half; center += 96) {
+      for (let start = -half; start < half; start += 96) {
+        const length = Math.min(96, half - start),
+          center = start + length / 2;
         instance(
-          g,
+          roadSurface(width, length),
           mats.asphalt,
           horizontal ? center : coordinate,
           0.035,
@@ -1509,15 +1591,214 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
         },
       ];
   businessLocations.push(...locations);
-  // Company forecourt and working greenhouse: the player's tangible beginning.
+  // An open-front shop replaces the old sealed headquarters box. Everything
+  // inside is actual geometry: the player walks through the door and aisles.
   reserve(48, 48);
   reserve(48, 144);
-  building(28, 66, 29, 24, 6.6, "modern", "#d8d5bd");
+  function companyShop() {
+    const x = 28,
+      z = 66,
+      width = 29,
+      depth = 24,
+      height = 4.8;
+    stats.buildings++;
+    box(mats.stone, x, 0.035, z, width, 0.07, depth);
+    for (let px = 15; px < 42; px += 2)
+      for (let pz = 55; pz < 78; pz += 2)
+        if (Math.round(px + pz) % 4 === 2)
+          box(mats.white, px, 0.077, pz, 1.96, 0.012, 1.96);
+    // Back and sides have real collisions; the five-metre front door is open.
+    for (const [wx, wz, ww, dd] of [
+      [13.5, 66, 0.3, 24],
+      [42.5, 66, 0.3, 24],
+      [28, 54, 29, 0.3],
+    ]) {
+      box(mats.plaster, wx, height / 2, wz, ww, height, dd);
+      collision(wx, wz, ww, dd, height);
+    }
+    for (const side of [-1, 1]) {
+      const wx = x + side * 9;
+      box(mats.concrete, wx, 0.45, 78, 10.8, 0.9, 0.3);
+      box(mats.glass, wx, 2.65, 78, 10.8, 3.5, 0.08);
+      collision(wx, 78, 10.8, 0.3, height);
+      for (const offset of [-5.3, 0, 5.3])
+        box(mats.dark, wx + offset, 2.5, 78.05, 0.08, 4.2, 0.11);
+    }
+    box(mats.dark, x, height - 0.2, 78, width, 0.4, 0.45);
+    for (const dx of [-3.5, 3.5])
+      box(mats.dark, x + dx, 2.4, 78, 0.16, 4.8, 0.4);
+    // The roof becomes a cutaway only as the player approaches the doorway.
+    const roof = new THREE.Mesh(boxGeo, mats.concrete);
+    roof.position.set(x, height + 0.15, z);
+    roof.scale.set(width + 0.8, 0.3, depth + 0.8);
+    roof.castShadow = roof.receiveShadow = true;
+    group.add(roof);
+    interiorRoofs.push({ mesh: roof, minX: 10, maxX: 46, minZ: 50, maxZ: 84 });
+    interiorZones.push({
+      id: "shop",
+      minX: 13.7,
+      maxX: 42.3,
+      minZ: 54.2,
+      maxZ: 77.8,
+      height: 4.8,
+    });
+    // A cash register, scale, produce display and handwritten price signs.
+    box(mats.wood, 28, 0.56, 60.5, 12, 1.12, 1.5);
+    box(mats.stone, 28, 1.16, 60.5, 12.25, 0.12, 1.65);
+    collision(28, 60.5, 12.25, 1.65, 1.28);
+    box(mats.dark, 31.8, 1.39, 60.5, 0.65, 0.35, 0.52);
+    box(mats.black, 31.8, 1.7, 60.28, 0.64, 0.4, 0.08, -0.08);
+    box(mats.steel, 24.3, 1.32, 60.5, 0.85, 0.2, 0.65);
+    for (const sx of [17, 39]) {
+      box(mats.wood, sx, 0.46, 67, 3.3, 0.92, 9);
+      collision(sx, 67, 3.3, 9, 1.2);
+      for (let pz = 63.4; pz <= 70.7; pz += 1.8) {
+        box(mats.dark, sx, 0.99, pz, 2.85, 0.12, 1.48);
+        for (const dx of [-0.8, 0, 0.8])
+          for (const dz of [-0.34, 0.34])
+            instance(
+              sphereGeo,
+              mats.tomato,
+              sx + dx,
+              1.2,
+              pz + dz,
+              0.24,
+              0.21,
+              0.23,
+              0,
+              dx < 0 ? "#9d3327" : "#bc4828",
+            );
+      }
+      sign(
+        "TOMATE DA NOSSA ESTUFA",
+        sx,
+        2.6,
+        62.47,
+        3.2,
+        0.58,
+        "#eee0b8",
+        "#45533c",
+      );
+    }
+    for (const [px, pz] of [
+      [16, 57],
+      [19, 57],
+      [37, 57],
+      [40, 57],
+    ])
+      crate(px, pz, 2);
+    sign(
+      "COLHEITA DO DIA",
+      28,
+      3.55,
+      54.2,
+      9,
+      1.05,
+      "#314a39",
+      "#f3e9cf",
+      0,
+      "DO PRODUTOR PARA A TUA MESA",
+    );
+    sign(
+      "LOJA DA QUINTA",
+      28,
+      4.9,
+      78.3,
+      18,
+      1.05,
+      "#2b4835",
+      "#efe6ca",
+      0,
+      "ENTRA · PRODUTOS DA NOSSA ESTUFA",
+    );
+    for (const sx of [20, 36]) {
+      box(mats.warmLight, sx, 4.3, 66, 0.3, 0.08, 8);
+      const light = new THREE.PointLight(0xffe4ba, 50, 19, 2);
+      light.position.set(sx, 3.8, 66);
+      group.add(light);
+    }
+    // Goods arriving at the door, not decoration blocking the entrance.
+    for (const px of [15.5, 40.5]) crate(px, 80.8, 1);
+    interactionPoints.push({
+      id: "shop-counter",
+      type: "shop",
+      label: "Loja da empresa",
+      x: 28,
+      z: 65,
+      actor: {
+        name: "Inês",
+        role: "Responsável da loja",
+        color: "#927257",
+        x: 28,
+        z: 58.6,
+      },
+    });
+  }
+  companyShop();
   greenhouse(65, 35, 25, 43, true);
+  // Both ends of the original greenhouse are open, with a wide central aisle.
+  // Water tank and harvest trolley sit beside that aisle rather than inside it.
+  cyl(mats.steel, 70, 1.1, 50, 1.25, 2.2);
+  collision(70, 50, 2.5, 2.5, 2.2);
+  beam(mats.dark, 70, 1.1, 50, 67.6, 0.25, 48, 0.035);
+  cyl(mats.ochre, 67.6, 0.35, 48, 0.12, 0.55);
+  crate(62.3, 31, 1);
+  crate(62.3, 33, 1);
+  sign(
+    "ESTUFA DE ANSELMO",
+    65,
+    5.1,
+    56.7,
+    10,
+    0.95,
+    "#3e5941",
+    "#ede8cc",
+    0,
+    "ÁGUA · CUIDADO · COLHEITA",
+  );
+  interactionPoints.push(
+    {
+      id: "greenhouse-water",
+      type: "water",
+      label: "Regar a estufa",
+      x: 65,
+      z: 48,
+    },
+    {
+      id: "greenhouse-harvest",
+      type: "harvest",
+      label: "Colher tomates maduros",
+      x: 65,
+      z: 32,
+    },
+  );
+  // Three purchased delivery vehicles can park here without blocking traffic.
+  box(mats.asphalt, 41, 0.045, 106, 66, 0.09, 10);
+  for (const px of [13, 23, 33, 43])
+    box(mats.white, px, 0.1, 106, 0.12, 0.015, 7.6);
+  for (const px of [18, 28, 38]) box(mats.white, px, 0.1, 110, 6, 0.015, 0.12);
+  sign(
+    "DISTRIBUIÇÃO · EXPEDIÇÃO",
+    59,
+    2.4,
+    109.8,
+    16,
+    1.05,
+    "#3d5544",
+    "#eee5cd",
+  );
+  for (const sx of [51, 67]) beam(mats.dark, sx, 0, 109.9, sx, 3, 109.9, 0.08);
+  interactionPoints.push({
+    id: "fleet-depot",
+    type: "fleet",
+    label: "Depósito e frota",
+    x: 53,
+    z: 106,
+  });
   const headquartersSign = sign(
     "RAIZ & SOL",
     28,
-    5.15,
+    6.3,
     78.2,
     17,
     1.5,
@@ -1534,13 +1815,13 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
   companyPhase = 3;
   for (let x = 18; x <= 38; x += 5)
     for (const z of [61, 68]) {
-      box(mats.window, x, 7.15, z, 4.2, 0.18, 5.7, 0, "#36515f");
-      box(mats.steel, x, 7, z, 4.4, 0.12, 5.9);
+      box(mats.window, x, 5.18, z, 4.2, 0.18, 5.7, 0, "#36515f");
+      box(mats.steel, x, 5.03, z, 4.4, 0.12, 5.9);
     }
   companyPhase = 0;
   for (const x of [14, 42]) bollard(x, 81);
   for (const x of [46, 49, 52]) crate(x, 75, 2);
-  planter(24, 83, 11, 1.4);
+  planter(16, 83, 3.2, 1.4);
   bench(39, 82);
   if (city) {
     districts.push(
@@ -1608,9 +1889,52 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
         id: "marina",
         name: "Passeio do Atlântico",
         x: 0,
-        z: 432,
+        z: 672,
         color: "#8ab0ad",
         description: "A frente marítima, hotéis e restaurantes junto ao mar.",
+      },
+    );
+    districts.push(
+      {
+        id: "lagoa",
+        name: "Parque da Lagoa",
+        x: -528,
+        z: 144,
+        color: "#8ca37f",
+        description: "Jardins públicos, caminhos e descanso entre os bairros.",
+      },
+      {
+        id: "jardins",
+        name: "Jardins do Poente",
+        x: -576,
+        z: -192,
+        color: "#c2b797",
+        description: "Moradias com quintais, oficinas de bairro e vida de rua.",
+      },
+      {
+        id: "norte",
+        name: "Vila do Norte",
+        x: 0,
+        z: -576,
+        color: "#b6b5a0",
+        description:
+          "Novas habitações, escolas e agricultura à porta da cidade.",
+      },
+      {
+        id: "tecnologico",
+        name: "Parque Tecnológico",
+        x: 576,
+        z: -192,
+        color: "#96aaa4",
+        description: "Laboratórios e empresas de tecnologia alimentar.",
+      },
+      {
+        id: "atlantico",
+        name: "Atlântico Sul",
+        x: -96,
+        z: 624,
+        color: "#91b4ad",
+        description: "Hotéis, esplanadas e passeios até à nova frente de mar.",
       },
     );
     reserve(-48, -48);
@@ -1622,6 +1946,121 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
     for (const x of blockCenters)
       for (const z of blockCenters) {
         if (isReserved(x, z)) continue;
+        if (x === -528 && (z === 144 || z === 48)) {
+          // A two-block park: irregular tree groves, walking paths and a pond.
+          box(mats.stone, x, 0.04, z, 4, 0.08, 76);
+          box(mats.stone, x, 0.042, z, 76, 0.08, 4);
+          for (const [dx, dz] of [
+            [-24, -24],
+            [22, 25],
+            [-27, 22],
+            [24, -20],
+          ]) {
+            tree(x + dx, z + dz, 1.35, true);
+            tree(x + dx + 6, z + dz - 5, 0.95, true);
+          }
+          if (z === 144) {
+            fountain(x - 18, z - 16, 9);
+            sign(
+              "PARQUE DA LAGOA",
+              x,
+              2.3,
+              z + 32,
+              13,
+              1,
+              "#365044",
+              "#eee3cc",
+            );
+          }
+          for (const dz of [-28, 28]) bench(x + 8, z + dz);
+          continue;
+        }
+        if (x < -480 && z > -480 && z < 384) {
+          // Low houses with private yards give the west a different silhouette.
+          for (const [dx, dz] of [
+            [-20, -20],
+            [20, -20],
+            [-20, 20],
+            [20, 20],
+          ]) {
+            building(
+              x + dx,
+              z + dz,
+              19,
+              22,
+              4.8 + random() * 1.4,
+              "old",
+              choose(["#ded4bc", "#c8b69a", "#d6c6a8"]),
+            );
+            planter(x + dx, z + dz + 15, 13, 1.3);
+            tree(x + dx - 11, z + dz + 12, 0.8, true);
+          }
+          for (const dz of [-34, 34]) bench(x, z + dz);
+          continue;
+        }
+        if (z < -480) {
+          // A northern village mixes modest homes and allotments, not towers.
+          building(x - 19, z - 18, 27, 30, 8.6, "old", "#d4cab1");
+          building(x + 20, z - 18, 26, 30, 11.8, "brick", "#c2b7a2");
+          farmingBlock(x - 18, z + 21, 31, 26, true);
+          for (const tx of [0, 29]) tree(x + tx, z + 25, 0.9, true);
+          if (Math.round(x / 96) % 3 === 0)
+            building(
+              x + 22,
+              z + 24,
+              20,
+              21,
+              4.2,
+              "old",
+              "#d8d6c0",
+              "OFICINA DO BAIRRO",
+            );
+          continue;
+        }
+        if (x > 480 && z < 192) {
+          // Campus blocks are spacious, with long laboratories and courtyards.
+          building(
+            x,
+            z - 17,
+            65,
+            34,
+            10 + random() * 6,
+            "modern",
+            "#c9d0c4",
+            "TECNOLOGIA ALIMENTAR",
+          );
+          for (const tx of [-26, -10, 10, 26]) tree(x + tx, z + 24, 0.95, true);
+          box(mats.stone, x, 0.05, z + 18, 65, 0.1, 24);
+          for (const dx of [-18, 18]) bench(x + dx, z + 23);
+          continue;
+        }
+        if (z > 480 && x < 192 && x > -480) {
+          // Seafront hotels, terraces and leisure courts form a coastal borough.
+          building(
+            x - 20,
+            z - 12,
+            28,
+            46,
+            14 + random() * 8,
+            "modern",
+            "#d3d6c4",
+          );
+          building(
+            x + 20,
+            z - 12,
+            28,
+            46,
+            12 + random() * 7,
+            "modern",
+            "#c9c5af",
+          );
+          for (const tx of [-31, 0, 31]) tree(x + tx, z + 26, 1.1, true);
+          for (const dx of [-17, 17]) {
+            bench(x + dx, z + 30);
+            planter(x + dx, z + 34, 9, 1.6);
+          }
+          continue;
+        }
         if (z <= -336 && (x < -96 || x > 192)) {
           if (
             (Math.round((x + 48) / 96) + Math.round((z + 48) / 96)) % 3 ===
@@ -1792,29 +2231,29 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
     for (const x of [216, 264]) planter(x, -14, 8, 2.4);
     sign("AGRONOVA", 244, 46, -32.8, 24, 3.2, "#273d3b", "#e0e5d7");
     // Waterfront terminal, working cranes and the Atlantic beyond the promenade.
-    for (const x of [240, 384]) crane(x, 478);
-    const promenade = plane(1000, 22, 0.8);
-    instance(promenade, mats.stone, 0, 0.14, 498, 1, 1, 1);
-    for (let x = -470; x < 480; x += 24) {
-      bollard(x, 507);
-      if (x % 48 === 2) bench(x, 493);
+    for (const x of [240, 384]) crane(x, half - 32);
+    const promenade = plane(half * 2 - 20, 22, 0.8);
+    instance(promenade, mats.stone, 0, 0.14, half - 12, 1, 1, 1);
+    for (let x = -half + 40; x < half - 30; x += 24) {
+      bollard(x, half - 3);
+      if (x % 48 === 2) bench(x, half - 17);
     }
     const water = plane(3200, 2200, 6);
-    instance(water, mats.water, 0, -0.6, 1610, 1, 1, 1);
-    collision(0, 513, 1030, 5, 1);
-    vessel(330, 570);
-    vessel(430, 620);
+    instance(water, mats.water, 0, -0.6, half + 1100, 1, 1, 1);
+    collision(0, half + 3, half * 2 + 10, 5, 1);
+    vessel(330, half + 60);
+    vessel(430, half + 110);
     for (const x of [-160, -100, -30, 45, 110]) {
-      box(mats.wood, x, 0.1, 545, 2, 0.28, 65);
-      box(mats.white, x + 6, 0.7, 552, 3.4, 1.5, 12);
-      box(mats.dark, x + 6, 1.7, 549, 2.9, 0.7, 5);
-      beam(mats.steel, x + 6, 1.5, 553, x + 6, 12, 553, 0.035);
+      box(mats.wood, x, 0.1, half + 35, 2, 0.28, 65);
+      box(mats.white, x + 6, 0.7, half + 42, 3.4, 1.5, 12);
+      box(mats.dark, x + 6, 1.7, half + 39, 2.9, 0.7, 5);
+      beam(mats.steel, x + 6, 1.5, half + 43, x + 6, 12, half + 43, 0.035);
     }
     sign(
       "SANTA TOMATA",
       -6,
       8,
-      481,
+      half - 29,
       43,
       3.8,
       "#3b5144",
@@ -1823,7 +2262,16 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
       "CIDADE DE BOAS RAÍZES",
     );
     for (const side of [-1, 1])
-      beam(mats.steel, -6 + side * 23, 0, 481, -6 + side * 23, 10.5, 481, 0.16);
+      beam(
+        mats.steel,
+        -6 + side * 23,
+        0,
+        half - 29,
+        -6 + side * 23,
+        10.5,
+        half - 29,
+        0.16,
+      );
   } else if (farm) {
     districts.push(
       {
@@ -2031,6 +2479,75 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
   const landscapeMesh = new THREE.Mesh(landscape, landscapeMat);
   landscapeMesh.receiveShadow = true;
   group.add(landscapeMesh);
+  // People have distinct meeting points off the carriageway; interaction x/z
+  // is the player's approach, actor x/z is where the person actually stands.
+  const clientInfo = [
+    {
+      id: "marta",
+      destination: "cooperativa",
+      name: "Marta Silva",
+      role: "Agrónoma da cooperativa",
+      color: "#69836b",
+      dx: -5,
+      dz: -6,
+    },
+    {
+      id: "rui",
+      destination: "mercado",
+      name: "Rui Costa",
+      role: "Comprador do mercado",
+      color: "#8b7459",
+      dx: 7,
+      dz: -7,
+    },
+    {
+      id: "sofia",
+      destination: "restaurantes",
+      name: "Sofia Almeida",
+      role: "Chef e compradora",
+      color: "#d5ccb6",
+      dx: 7,
+      dz: -6,
+    },
+    {
+      id: "artur",
+      destination: "porto",
+      name: "Artur Matos",
+      role: "Distribuidor de exportação",
+      color: "#526675",
+      dx: 9,
+      dz: 2,
+    },
+    {
+      id: "leonor",
+      destination: "universidade",
+      name: "Dra. Leonor",
+      role: "Investigadora de agronomia",
+      color: "#b4bdad",
+      dx: 4,
+      dz: 2,
+    },
+  ];
+  for (const client of clientInfo) {
+    const at = businessLocations.find((p) => p.id === client.destination);
+    const x = at.x + client.dx,
+      z = at.z + client.dz;
+    interactionPoints.push({
+      id: client.id,
+      type: "client",
+      label: client.name,
+      x,
+      z,
+      destination: client.destination,
+      actor: {
+        name: client.name,
+        role: client.role,
+        color: client.color,
+        x: x + 1.1,
+        z: z - 0.4,
+      },
+    });
+  }
   // Generic forecourt signs identify destinations without hard-coded UI text.
   for (const location of businessLocations) {
     const x = location.x + 4,
@@ -2180,6 +2697,13 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
       renderFocus.x = focus.x;
       renderFocus.z = focus.z;
     }
+    for (const roof of interiorRoofs)
+      roof.mesh.visible = !(
+        renderFocus.x > roof.minX &&
+        renderFocus.x < roof.maxX &&
+        renderFocus.z > roof.minZ &&
+        renderFocus.z < roof.maxZ
+      );
     mats.water.normalMap.offset.set(elapsed * 0.006, elapsed * 0.003);
     const windowRange = low ? 160 : high ? 360 : 250,
       treeRange = low ? 260 : high ? 600 : 440;
@@ -2207,6 +2731,10 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
   ];
   const trafficRoutes = city
     ? [
+        loop(-672, -672, 672, 672),
+        loop(-576, -384, -384, 384),
+        loop(-384, 480, 192, 672),
+        loop(384, -384, 672, 192),
         loop(-384, -384, 384, 384),
         loop(-192, -192, 192, 192),
         loop(-96, -96, 96, 96),
@@ -2255,10 +2783,10 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
           { x: 205, z: -12 },
         ],
         [
-          { x: -178, z: 494 },
-          { x: -15, z: 494 },
-          { x: 145, z: 494 },
-          { x: 220, z: 494 },
+          { x: -178, z: half - 16 },
+          { x: -15, z: half - 16 },
+          { x: 145, z: half - 16 },
+          { x: 220, z: half - 16 },
         ],
       ]
     : [
@@ -2288,6 +2816,14 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
     roads,
     districts,
     businessLocations,
+    interactionPoints,
+    interiorZones,
+    fleetSpawns: [
+      { x: 18, z: 106, yaw: Math.PI },
+      { x: 28, z: 106, yaw: Math.PI },
+      { x: 38, z: 106, yaw: Math.PI },
+    ],
+    fleetReturnDropoff: { x: 28, z: 106 },
     trafficRoutes,
     pedestrianRoutes,
     stats,

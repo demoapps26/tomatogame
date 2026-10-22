@@ -3369,3 +3369,476 @@ body[data-state="company"] #touch-controls {
     font-size: 15px;
   }
 }
+
+/* On-site business: shop counters, crop work and client conversations. */
+body[data-state="venue"] #menu,
+body[data-state="venue"] #touch-controls,
+body[data-state="venue"] #crosshair,
+body[data-state="venue"] #prompt,
+body[data-state="venue"] #story-toast {
+  display: none;
+}
+body[data-state="venue"] #hud {
+  pointer-events: none;
+  opacity: 0.5;
+}
+body:not([data-state="playing"]) #venue-work {
+  display: none;
+}
+.venue-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 26px;
+  background: linear-gradient(
+    90deg,
+    #071a1008 0%,
+    #071a1030 40%,
+    #071a1075 100%
+  );
+}
+.venue-dialog {
+  display: flex;
+  flex-direction: column;
+  width: min(540px, 48vw);
+  max-height: calc(100dvh - 52px);
+  border: 1px solid #d9dcc158;
+  border-radius: 6px;
+  box-shadow: 0 20px 90px #07150e66;
+  background: #eff0e5f7;
+  color: #243c2b;
+  overflow: hidden;
+}
+.venue-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 17px 22px 0;
+}
+.venue-header .company-tag {
+  letter-spacing: 1.3px;
+  font-size: 8px;
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+#venue-close {
+  flex-shrink: 0;
+  border: 1px solid #9eaf9259;
+  border-radius: 50%;
+  background: transparent;
+  width: 30px;
+  height: 30px;
+  font-size: 23px;
+  color: #52634a;
+  line-height: 20px;
+}
+#venue-close:hover {
+  background: #e2e7d7;
+}
+.venue-heading {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+  padding: 15px 24px 18px;
+  border-bottom: 1px solid #bac6aa70;
+}
+.venue-monogram {
+  display: grid;
+  place-items: center;
+  width: 50px;
+  height: 57px;
+  flex-shrink: 0;
+  background: #354d3c;
+  color: #e2c49d;
+  font-family: Georgia, serif;
+  font-size: 20px;
+  border-radius: 2px;
+  border-bottom: 3px solid #cda26a;
+}
+.venue-heading h2 {
+  font-family: Georgia, serif;
+  font-size: clamp(22px, 2.1vw, 30px);
+  font-weight: 400;
+  line-height: 1.1;
+  margin: 0 0 7px;
+  letter-spacing: -0.4px;
+}
+.venue-heading p {
+  margin: 0;
+  font-size: 10px;
+  line-height: 1.5;
+  color: #748267;
+}
+.venue-body {
+  padding: 21px 24px 26px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  min-height: 0;
+  scrollbar-width: thin;
+  scrollbar-color: #a3b48d transparent;
+}
+.venue-body h3 {
+  color: #35503a;
+  font-size: 14px;
+  line-height: 1.4;
+  margin: 0 0 7px;
+}
+.venue-body p,
+.venue-body small,
+.venue-intro {
+  font-size: 11px;
+  line-height: 1.75;
+  color: #728064;
+  margin: 0 0 12px;
+}
+.venue-dialogue {
+  position: relative;
+  font-family: Georgia, serif;
+  font-size: 19px;
+  line-height: 1.55;
+  color: #3d5440;
+  margin: 0 0 14px;
+  padding-left: 16px;
+  border-left: 2px solid #bb965f;
+}
+.venue-feedback {
+  margin: 0;
+  padding: 12px 24px;
+  background: #e5ebd8;
+  color: #6b784b;
+  border-bottom: 1px solid #c2ceb264;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.venue-feedback:empty {
+  display: none;
+}
+.venue-offers,
+.venue-fleet {
+  display: grid;
+  gap: 12px;
+}
+.venue-offer,
+.venue-contract {
+  border: 1px solid #c8d1ba;
+  border-radius: 3px;
+  padding: 16px;
+  background: #fafbf1;
+}
+.venue-contract {
+  margin-bottom: 12px;
+}
+.venue-contract > .company-tag {
+  margin-bottom: 10px;
+}
+.venue-offer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+}
+.venue-offer .company-action,
+.venue-offer > small {
+  grid-column: 1 / -1;
+}
+.venue-offer p {
+  margin-bottom: 0;
+}
+.venue-offer-value {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  align-items: flex-end;
+  color: #41623e;
+  font-variant-numeric: tabular-nums;
+}
+.venue-offer-value strong {
+  font-size: 20px;
+  font-weight: 400;
+}
+.venue-offer-value span {
+  color: #829071;
+  font-size: 9px;
+}
+.venue-price {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 15px;
+  margin: 12px 0;
+}
+.venue-price strong {
+  color: #3b603c;
+  font-size: 26px;
+  font-weight: 400;
+}
+.venue-price span {
+  color: #8a9679;
+  font-size: 10px;
+}
+.venue-actions,
+.company-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.venue-body .company-action {
+  padding: 11px 14px;
+  min-height: 39px;
+  font-size: 10px;
+}
+.venue-body .company-action:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.venue-body .company-action + small,
+.company-card > .company-action + small {
+  display: block;
+  margin-top: 9px;
+}
+.venue-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 19px 0;
+}
+.venue-metrics > div {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 15px;
+  border: 1px solid #c8d3b88c;
+}
+.venue-metrics span {
+  color: #859474;
+  font-size: 10px;
+}
+.venue-metrics strong {
+  color: #3b593c;
+  font-size: 23px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+.venue-metrics small {
+  color: #859474;
+  font-size: 10px;
+}
+.venue-dispatch {
+  margin-top: 23px;
+}
+.venue-dispatch .venue-offer {
+  margin-bottom: 10px;
+}
+.venue-dispatch .venue-offer .company-action {
+  grid-column: auto;
+}
+.venue-body .venue-note {
+  margin: 16px 0 0;
+  padding-top: 13px;
+  border-top: 1px solid #c1cdb269;
+  font-size: 10px;
+}
+.venue-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 13px 24px;
+  background: #e4e9d9;
+  border-top: 1px solid #c3ceb564;
+  color: #778569;
+  font-size: 9px;
+}
+.venue-footer > span:first-child {
+  color: #47623e;
+}
+.venue-work {
+  position: absolute;
+  z-index: 14;
+  bottom: 125px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  width: min(420px, calc(100% - 40px));
+  padding: 16px 19px;
+  border: 1px solid #d5ddbc55;
+  border-left: 3px solid #d4b275;
+  border-radius: 3px;
+  background: #18372be8;
+  color: #edf0df;
+  pointer-events: none;
+  box-shadow: 0 9px 35px #0c211940;
+}
+.venue-work-symbol {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  color: #d9c08c;
+  font-size: 27px;
+}
+.venue-work > div {
+  min-width: 0;
+  flex: 1;
+}
+.venue-work strong,
+.venue-work div > span {
+  display: block;
+}
+.venue-work strong {
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 500;
+}
+.venue-work div > span {
+  color: #becdb1;
+  font-size: 10px;
+  line-height: 1.5;
+}
+.venue-work progress,
+.venue-contract progress,
+.company-fleet-unit progress {
+  display: block;
+  width: 100%;
+  height: 5px;
+  margin-top: 10px;
+  border: 0;
+  border-radius: 1px;
+  accent-color: #b5c68d;
+}
+.venue-work progress {
+  height: 3px;
+  accent-color: #d2b77e;
+}
+.company-field-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 8px 0 20px;
+  color: #82906d;
+  font-size: 10px;
+}
+.company-field-stats b {
+  color: #48623f;
+  font-size: 18px;
+  font-weight: 400;
+}
+.company-inline-actions .company-action {
+  padding: 9px 13px;
+}
+.company-fleet-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px;
+  margin: 16px 0;
+}
+.company-fleet-unit {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 15px;
+  background: #e9eddf;
+  border: 1px solid #cbd5bd;
+  border-radius: 3px;
+}
+.company-fleet-unit strong {
+  color: #4c6442;
+  font-size: 12px;
+  font-weight: 600;
+}
+.company-fleet-unit > span,
+.company-fleet-unit small,
+.company-fleet-note {
+  color: #8a9577;
+  font-size: 10px;
+  line-height: 1.6;
+}
+.company-card .company-action + .company-action {
+  margin-top: 8px;
+}
+@media (max-width: 900px) {
+  .venue-overlay {
+    padding: 18px;
+  }
+  .venue-dialog {
+    width: min(490px, 62vw);
+    max-height: calc(100dvh - 36px);
+  }
+}
+@media (max-width: 600px) {
+  .venue-overlay {
+    padding: 0;
+    align-items: flex-end;
+    background: #0b221850;
+  }
+  .venue-dialog {
+    width: 100%;
+    max-height: calc(100dvh - 28px);
+    border-radius: 8px 8px 0 0;
+    border-bottom: 0;
+  }
+  .venue-header {
+    padding: 12px 17px 0;
+  }
+  .venue-heading {
+    padding: 10px 17px 15px;
+    gap: 12px;
+  }
+  .venue-heading h2 {
+    font-size: 25px;
+  }
+  .venue-monogram {
+    height: 49px;
+    width: 44px;
+    font-size: 17px;
+  }
+  .venue-body {
+    padding: 18px 17px 25px;
+  }
+  .venue-dialogue {
+    font-size: 17px;
+  }
+  .venue-feedback,
+  .venue-footer {
+    padding: 10px 17px;
+  }
+  .venue-work {
+    bottom: 188px;
+    padding: 13px 14px;
+    gap: 9px;
+  }
+  .venue-offer {
+    padding: 13px;
+  }
+  .venue-dispatch .venue-offer .company-action {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-height: 540px) and (min-width: 601px) {
+  .venue-overlay {
+    padding: 10px;
+  }
+  .venue-dialog {
+    max-height: calc(100dvh - 20px);
+    width: min(530px, 64vw);
+  }
+  .venue-heading {
+    padding-top: 7px;
+    padding-bottom: 10px;
+  }
+  .venue-header {
+    padding-top: 10px;
+  }
+  .venue-body {
+    padding-top: 14px;
+  }
+}

@@ -47,10 +47,62 @@ function surfaceTexture(kind = "cloth", seed = 17) {
   texture.needsUpdate = true;
   return texture;
 }
+// Small per-instance albedo/roughness maps break up otherwise perfectly uniform
+// surfaces. They stay local and are owned by the instance's materials, just like
+// the normal maps, so the scene's existing resource disposal can release them.
+function surfaceFinish(kind = "cloth", seed = 1) {
+  const size = 64;
+  const colorData = new Uint8Array(size * size * 4);
+  const roughnessData = new Uint8Array(size * size * 4);
+  let value = seed >>> 0;
+  const random = () => {
+    value = (Math.imul(value, 1664525) + 1013904223) >>> 0;
+    return value / 4294967296;
+  };
+  for (let y = 0; y < size; y++)
+    for (let x = 0; x < size; x++) {
+      const i = (y * size + x) * 4;
+      const grain = random();
+      const broad = Math.sin(x * 0.19 + Math.sin(y * 0.11)) * 0.5 + 0.5;
+      const weave = ((x + y) % 3 === 0 ? 1 : 0) * 2;
+      const tone =
+        kind === "skin"
+          ? 247 + grain * 7 - broad * 3
+          : kind === "rubber"
+            ? 232 + grain * 16 - broad * 5
+            : 244 + grain * 8 - broad * 3 - weave;
+      colorData[i] = tone;
+      colorData[i + 1] = tone - (kind === "skin" ? 1 : 0);
+      colorData[i + 2] = tone - (kind === "skin" ? 2 : 0);
+      colorData[i + 3] = 255;
+      const roughness =
+        kind === "skin" ? 211 + grain * 27 : 230 + grain * 23 - broad * 7;
+      roughnessData[i] = roughness;
+      roughnessData[i + 1] = roughness;
+      roughnessData[i + 2] = roughness;
+      roughnessData[i + 3] = 255;
+    }
+  const make = (data, colorSpace = THREE.NoColorSpace) => {
+    const texture = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
+    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+    texture.colorSpace = colorSpace;
+    texture.needsUpdate = true;
+    return texture;
+  };
+  return {
+    map: make(colorData, THREE.SRGBColorSpace),
+    roughnessMap: make(roughnessData),
+  };
+}
 function textile(color, normal, repeat = 3) {
   const material = standard(color, 0.93);
   material.normalMap = normal;
-  material.normalScale = new THREE.Vector2(0.16, 0.16);
+  material.normalScale = new THREE.Vector2(0.12, 0.12);
+  // Share maps within one garment/actor, never across separately disposed actors.
+  if (!normal.userData.finish) normal.userData.finish = surfaceFinish("cloth");
+  Object.assign(material, normal.userData.finish);
+  material.map.repeat.set(repeat, repeat);
+  material.roughnessMap.repeat.set(repeat, repeat);
   normal.repeat.set(repeat, repeat);
   return material;
 }
@@ -262,8 +314,9 @@ export function createCharacter({
   const skins = [0xc18c6b, 0xb17c5c, 0x825842, 0xd1a180, 0xa87d61];
   const skin = standard(
     enemy ? 0xa57455 : skins[Math.abs(index) % skins.length],
-    0.63,
+    0.78,
   );
+  Object.assign(skin, surfaceFinish("skin", 109 + index));
   skin.normalMap = leatherGrain;
   skin.normalScale = new THREE.Vector2(0.035, 0.035);
   const leather = standard(0x322f28, 0.73),
@@ -556,10 +609,10 @@ export function createVehicle(color = 0xb14d39) {
   group.name = "tomato-delivery-pickup";
   const paint = new THREE.MeshPhysicalMaterial({
       color,
-      roughness: 0.28,
-      metalness: 0.4,
-      clearcoat: 0.65,
-      clearcoatRoughness: 0.18,
+      roughness: 0.31,
+      metalness: 0.27,
+      clearcoat: 0.72,
+      clearcoatRoughness: 0.2,
     }),
     paintDark = standard(
       new THREE.Color(color).multiplyScalar(0.76),
@@ -572,17 +625,20 @@ export function createVehicle(color = 0xb14d39) {
     seat = textile(0x414b44, surfaceTexture("cloth", 47)),
     wood = standard(0x92734f, 0.96);
   const grain = surfaceTexture("leather", 72);
+  Object.assign(rubber, surfaceFinish("rubber", 83));
   rubber.normalMap = grain;
   rubber.normalScale = new THREE.Vector2(0.22, 0.22);
   wood.normalMap = surfaceTexture("wood", 81);
   wood.normalScale = new THREE.Vector2(0.13, 0.13);
   const glass = new THREE.MeshPhysicalMaterial({
-    color: 0x52716e,
-    roughness: 0.09,
-    metalness: 0.05,
+    color: 0x718787,
+    roughness: 0.075,
+    metalness: 0.1,
     transparent: true,
-    opacity: 0.54,
-    transmission: 0.06,
+    opacity: 0.47,
+    // Reflection plus alpha is sufficient at this scale and avoids a separate
+    // scene transmission render for every visible fleet/traffic vehicle.
+    transmission: 0,
     thickness: 0.035,
     side: THREE.DoubleSide,
     depthWrite: false,
@@ -923,6 +979,28 @@ export function createVehicle(color = 0xb14d39) {
     body.add(crate);
   }
   mergeDirectMeshes(body);
+  // Road dust is strongest at the sills and wheel arches, while the roof keeps
+  // its clean clearcoat. Vertex colours preserve the existing material batches.
+  const dust = new THREE.Color(0xb7a38a);
+  for (const object of body.children) {
+    if (!object.isMesh || ![paint, paintDark].includes(object.material))
+      continue;
+    const positions = object.geometry.getAttribute("position");
+    const colors = new Float32Array(positions.count * 3);
+    for (let i = 0; i < positions.count; i++) {
+      const x = positions.getX(i),
+        y = positions.getY(i),
+        z = positions.getZ(i);
+      const lowerBody = 1 - THREE.MathUtils.smoothstep(y, 0.45, 1.18);
+      const streak = 0.5 + 0.5 * Math.sin(x * 17 + Math.sin(z * 8));
+      const strength = lowerBody * (0.12 + streak * 0.1);
+      colors[i * 3] = THREE.MathUtils.lerp(1, dust.r, strength);
+      colors[i * 3 + 1] = THREE.MathUtils.lerp(1, dust.g, strength);
+      colors[i * 3 + 2] = THREE.MathUtils.lerp(1, dust.b, strength);
+    }
+    object.geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+    object.material.vertexColors = true;
+  }
   let oldSpeed = 0,
     bodyTime = 0;
   return {
