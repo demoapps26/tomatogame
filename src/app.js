@@ -7,6 +7,15 @@ import {
   createPickup,
 } from "./actors.js";
 import { createNavigation } from "./navigation.js";
+import {
+  createCompany,
+  normalizeCompany,
+  getCompanyView,
+  deliverContract,
+} from "./company.js";
+import { createCompanyPanel } from "./company-panel.js";
+import { createCityLife } from "./life.js";
+import { createVisuals } from "./graphics.js";
 
 const $ = (id) => document.getElementById(id);
 const canvas = $("view");
@@ -37,6 +46,7 @@ function save() {
   try {
     localStorage.setItem("tomato-republic-v2", JSON.stringify(settings));
   } catch {}
+  saveCampaign();
 }
 
 let renderer;
@@ -52,41 +62,35 @@ try {
   $("play").disabled = true;
   throw new Error("WebGL 2 is required to run Tomato Republic.");
 }
-renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.12;
-renderer.shadowMap.enabled = settings.quality !== "low";
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene();
-scene.background = new THREE.Color("#b8d2d8");
-scene.fog = new THREE.FogExp2("#b8d2d8", 0.0046);
-const hemi = new THREE.HemisphereLight(0xc4dbe7, 0x777052, 2.4);
-scene.add(hemi);
-const sun = new THREE.DirectionalLight(0xffe4b1, 3.3);
-sun.position.set(-45, 75, 35);
-sun.castShadow = true;
-sun.shadow.mapSize.set(
-  settings.quality === "high" ? 2048 : 1024,
-  settings.quality === "high" ? 2048 : 1024,
-);
-Object.assign(sun.shadow.camera, {
-  left: -65,
-  right: 65,
-  top: 65,
-  bottom: -65,
-  near: 1,
-  far: 190,
-});
-sun.shadow.normalBias = 0.05;
-sun.shadow.bias = -0.0002;
-scene.add(sun);
-scene.add(sun.target);
 const camera = new THREE.PerspectiveCamera(
   58,
   innerWidth / innerHeight,
   0.12,
-  320,
+  1800,
 );
+const visuals = createVisuals(renderer, scene, camera, settings.quality);
+let savedCampaign = null;
+try {
+  const data = JSON.parse(
+    localStorage.getItem("tomato-republic-campaign-v3") || "null",
+  );
+  if (data?.version === 3) savedCampaign = data;
+} catch {}
+let company = normalizeCompany(savedCampaign?.company || createCompany());
+let companyView = getCompanyView(company),
+  founded = !!savedCampaign?.founded;
+let activeContractId = savedCampaign?.activeContractId || null,
+  companyPanel = null,
+  life = null;
+let renderDirty = true;
+let replacingCampaign = false;
+let initialized = false,
+  autosaveTime = 0,
+  routeTime = 0,
+  route = [],
+  lastStoryEvent = savedCampaign?.lastStoryEvent || "",
+  storyTime = 0;
 const raycaster = new THREE.Raycaster();
 const groundRay = new THREE.Vector2(0, 0);
 const keys = new Set();
@@ -139,14 +143,6 @@ let wanted = 0,
   messageTime = 0,
   hudTime = 0,
   minimapTime = 0;
-let quest = {
-  stage: 0,
-  phase: 0,
-  kills: 0,
-  checkpoints: 0,
-  timer: 95,
-  complete: false,
-};
 let kills = 0,
   marker,
   markerRing,
@@ -207,6 +203,8 @@ function sound(kind) {
 }
 function notify(text, duration = 4) {
   $("notice").textContent = text;
+  const feedback = document.getElementById("company-feedback");
+  if (feedback && state === "company") feedback.textContent = text;
   messageTime = duration;
 }
 function clearGroup(group) {
@@ -230,7 +228,7 @@ function clearGroup(group) {
   materials.forEach((x) => x.dispose());
   textures.forEach((x) => x.dispose());
 }
-function hitBox(x, z, radius = 0.35) {
+function hitBox(x, z, radius = 0.35, height = null) {
   if (!world) return false;
   const b = world.bounds;
   if (
@@ -242,20 +240,50 @@ function hitBox(x, z, radius = 0.35) {
     return true;
   return world.colliders.some(
     (box) =>
+      (height === null ||
+        (height >= (box.minY ?? 0) - radius &&
+          height <= (box.maxY ?? 20) + radius)) &&
       x + radius > box.minX &&
       x - radius < box.maxX &&
       z + radius > box.minZ &&
       z - radius < box.maxZ,
   );
 }
+function carAt(x, z, radius = 0.35, ignore = null) {
+  for (const car of [...cars, ...(life?.vehicles || [])]) {
+    if (
+      car === ignore ||
+      Math.abs(x - car.position.x) > 5 + radius ||
+      Math.abs(z - car.position.z) > 5 + radius
+    )
+      continue;
+    const dx = x - car.position.x,
+      dz = z - car.position.z,
+      c = Math.cos(car.yaw),
+      s = Math.sin(car.yaw);
+    const localX = dx * c - dz * s,
+      localZ = dx * s + dz * c;
+    const distanceX = Math.max(0, Math.abs(localX) - 1.15),
+      distanceZ = Math.max(0, Math.abs(localZ) - 2.18);
+    if (distanceX * distanceX + distanceZ * distanceZ < radius * radius)
+      return car;
+  }
+  return null;
+}
 function moveTo(entity, dx, dz, radius) {
   let blocked = false;
   const count = Math.max(1, Math.ceil(Math.hypot(dx, dz) / 0.3));
   for (let i = 0; i < count; i++) {
-    if (!hitBox(entity.position.x + dx / count, entity.position.z, radius))
+    if (
+      !hitBox(entity.position.x + dx / count, entity.position.z, radius) &&
+      !carAt(entity.position.x + dx / count, entity.position.z, radius, entity)
+    )
       entity.position.x += dx / count;
     else blocked = true;
-    if (!hitBox(entity.position.x, entity.position.z + dz / count, radius))
+    if (
+      !hitBox(entity.position.x, entity.position.z + dz / count, radius) &&
+      !carAt(entity.position.x, entity.position.z + dz / count, radius, entity)
+    )
       entity.position.z += dz / count;
     else blocked = true;
   }
@@ -269,6 +297,7 @@ function lineClear(a, b) {
         THREE.MathUtils.lerp(a.x, b.x, i / count),
         THREE.MathUtils.lerp(a.z, b.z, i / count),
         0.05,
+        1.35,
       )
     )
       return false;
@@ -301,12 +330,119 @@ function addEnemy(position, index = 0) {
     navTime: 0,
   });
 }
+function currentContract() {
+  return (
+    company.contracts?.find(
+      (contract) =>
+        contract.id === activeContractId &&
+        ["accepted", "active", "reserved"].includes(contract.status),
+    ) || null
+  );
+}
+function businessLocation(id) {
+  return (
+    world.businessLocations?.find((location) => location.id === id) || null
+  );
+}
 function questPoint() {
-  const points = world.missionSpawns;
-  if (quest.complete) return null;
-  if (quest.stage === 0) return points[quest.phase === 0 ? 0 : 1];
-  if (quest.stage === 1) return null;
-  return points[[2, 3, 4][quest.checkpoints % 3]];
+  const contract = currentContract();
+  if (contract)
+    return mapId === "cidade" ? businessLocation(contract.destination) : null;
+  return businessLocation("sede");
+}
+function saveCampaign() {
+  if (!initialized || replacingCampaign) return;
+  try {
+    const data = {
+      version: 3,
+      savedAt: Date.now(),
+      company,
+      founded,
+      mapId,
+      position: { x: player.position.x, z: player.position.z },
+      health: player.health,
+      ammo: player.ammo,
+      yaw,
+      pitch,
+      activeContractId,
+      lastStoryEvent,
+      vehicles: cars.map((car) => ({
+        x: car.position.x,
+        z: car.position.z,
+        yaw: car.yaw,
+      })),
+      driving: player.vehicle ? cars.indexOf(player.vehicle) : -1,
+    };
+    localStorage.setItem("tomato-republic-campaign-v3", JSON.stringify(data));
+    if ($("save-state"))
+      $("save-state").textContent = "Progresso guardado neste navegador";
+  } catch {
+    if ($("save-state"))
+      $("save-state").textContent =
+        "Este navegador não permitiu guardar o progresso";
+  }
+}
+function changeCompany(next) {
+  renderDirty = true;
+  company = normalizeCompany(next);
+  companyView = getCompanyView(company);
+  if (activeContractId && !currentContract()) {
+    activeContractId = null;
+    route = [];
+  }
+  if (world?.updateCompany?.(company))
+    navigation = createNavigation(
+      world.colliders,
+      world.bounds,
+      world.navigationCellSize || 3,
+    );
+  updateMission();
+  updateHud();
+  saveCampaign();
+  checkStory();
+}
+function checkStory() {
+  const event = companyView.event;
+  if (!founded || !event?.ready || event.id === lastStoryEvent) return;
+  lastStoryEvent = event.id;
+  storyTime = 12;
+  $("story-speaker").textContent = companyView.mentor || "Marta · Cooperativa";
+  $("story-text").textContent =
+    companyView.dialogue || event.body || companyView.objective;
+  $("story-toast").hidden = false;
+}
+function openCompany(tab = "overview") {
+  if (!started) return;
+  setState("company");
+  $("company-panel").hidden = false;
+  companyPanel.open(tab);
+  $("story-toast").hidden = true;
+  $("close-company").focus();
+}
+function closeCompany() {
+  $("company-panel").hidden = true;
+  setState("playing");
+  last = performance.now();
+  saveCampaign();
+}
+function trackContract(id) {
+  const contract = company.contracts?.find(
+    (item) =>
+      item.id === id &&
+      ["accepted", "active", "reserved"].includes(item.status),
+  );
+  if (!contract) return;
+  activeContractId = id;
+  if (mapId !== "cidade") resetMap("cidade");
+  const point = questPoint();
+  route = point ? navigation.findPath(player.position, point) : [];
+  routeTime = 4;
+  notify(
+    "Entrega marcada. Segue a rota dourada no minimapa e carrega em E no destino.",
+    6,
+  );
+  updateMission();
+  saveCampaign();
 }
 function makeMarker() {
   const group = new THREE.Group();
@@ -346,6 +482,7 @@ function makeMarker() {
 }
 function resetMap(id) {
   transitioning = true;
+  renderDirty = true;
   for (const shot of shots) shot.mesh.removeFromParent();
   shots = [];
   for (const item of pickups) clearGroup(item.mesh);
@@ -357,10 +494,17 @@ function resetMap(id) {
   for (const car of cars) clearGroup(car.actor.group);
   cars = [];
   if (marker) clearGroup(marker);
+  life?.dispose();
+  life = null;
   world?.dispose();
   mapId = MAPS.some((map) => map.id === id) ? id : "cidade";
   world = buildWorld(scene, mapId, settings.quality);
-  navigation = createNavigation(world.colliders, world.bounds);
+  world.updateCompany?.(company);
+  navigation = createNavigation(
+    world.colliders,
+    world.bounds,
+    world.navigationCellSize || 3,
+  );
   player.position.set(world.spawn.x, 0, world.spawn.z);
   player.health = 100;
   player.ammo = 12;
@@ -377,14 +521,6 @@ function resetMap(id) {
   kills = 0;
   reloadTime = 0;
   cooldown = 0;
-  quest = {
-    stage: 0,
-    phase: 0,
-    kills: 0,
-    checkpoints: 0,
-    timer: 95,
-    complete: false,
-  };
   const colors = [0xcf5538, 0x8baf9f, 0xe0c38a, 0x384e61, 0xc5d0bb];
   world.vehicleSpawns.slice(0, 5).forEach((spawn, index) => {
     const actor = createVehicle(colors[index % colors.length]);
@@ -402,11 +538,9 @@ function resetMap(id) {
   world.enemySpawns
     .slice(0, 6)
     .forEach((spawn, index) => addEnemy(spawn, index));
-  const point = world.missionSpawns[0],
-    crate = createPickup("crate");
-  crate.position.set(point.x, 0, point.z);
-  scene.add(crate);
-  pickups.push({ mesh: crate, type: "quest", position: crate.position });
+  life = createCityLife(scene, world, settings.quality);
+  route = [];
+  routeTime = 0;
   makeMarker();
   $("location").textContent = MAPS.find((map) => map.id === mapId).name;
   document.querySelectorAll("[data-map]").forEach((button) => {
@@ -417,72 +551,68 @@ function resetMap(id) {
   updateMission();
   updateHud();
   cameraUpdate(0.5, true);
+  world.update?.(time, player.position);
+  for (const car of cars)
+    car.actor.group.visible = car.position.distanceTo(player.position) < 240;
+  for (const enemy of enemies)
+    enemy.actor.group.visible =
+      enemy.position.distanceTo(player.position) < 145;
   transitioning = false;
 }
 function updateMission() {
-  const titles = [
-    "Uma caixa. Um começo.",
-    "O bairro não se entrega.",
-    "Entrega expressa.",
-  ];
-  $("mission-title").textContent = quest.complete
-    ? "A cidade é tua."
-    : titles[quest.stage];
-  let text, progress;
-  if (quest.complete) {
-    text = "Missões concluídas. Explora, conduz ou escolhe outro mapa no menu.";
-    progress = "MAPA CONCLUÍDO";
-  } else if (quest.stage === 0) {
-    text =
-      quest.phase === 0
-        ? "Recolhe a caixa de tomates no marcador dourado."
-        : "Leva a colheita ao ponto de entrega. Um veículo torna a viagem mais rápida.";
-    progress = quest.phase === 0 ? "RECOLHER COLHEITA" : "ENTREGAR COLHEITA";
-  } else if (quest.stage === 1) {
-    text =
-      "A patrulha rival anda pelo bairro. Acerta três tomates em cada adversário e elimina três rivais.";
-    progress = `RIVAIS ${quest.kills} / 3`;
-  } else {
-    text =
-      "Entra num veículo e passa pelos três pontos de entrega antes de o tempo acabar.";
-    progress = `ENTREGAS ${quest.checkpoints} / 3 · ${Math.ceil(quest.timer)} s`;
-  }
-  $("mission-description").textContent = text;
-  $("mission-progress").textContent = progress;
+  const contract = currentContract(),
+    point = questPoint();
+  const remoteContract = contract && mapId !== "cidade";
+  const distance = point
+    ? Math.round(
+        Math.hypot(point.x - player.position.x, point.z - player.position.z),
+      )
+    : 0;
+  $("mission-title").textContent = contract
+    ? contract.title
+    : companyView.event?.title || companyView.title;
+  $("mission-description").textContent = remoteContract
+    ? "Esta entrega é feita em Santa Tomata. Abre B Empresa → Contratos e escolhe «Seguir entrega no mapa» para regressar à cidade e retomar a rota."
+    : contract
+      ? `Leva ${contract.quantity} caixas a ${point?.name || contract.destination}. Recebes ${Math.round(contract.payment)} € após a entrega.`
+      : companyView.objective;
+  $("mission-progress").textContent = remoteContract
+    ? `RETOMAR EM SANTA TOMATA · DIA ${contract.deadlineDay}`
+    : contract
+      ? `ENTREGAR · ${distance} m · DIA ${contract.deadlineDay}`
+      : `${companyView.chapterLabel} · B EMPRESA`;
 }
 function reward(amount, text) {
-  settings.cash += amount;
-  save();
+  company = { ...company, cash: company.cash + amount };
+  companyView = getCompanyView(company);
+  saveCampaign();
   sound("reward");
-  notify(`${text} +${amount} 🍅`, 5);
+  notify(`${text} +${amount} €`, 5);
   updateHud();
 }
 function missionAction() {
-  const point = questPoint();
+  const contract = currentContract();
+  const remoteContract = contract && mapId !== "cidade";
+  const point =
+    questPoint() || (remoteContract ? businessLocation("sede") : null);
   if (
     !point ||
-    quest.complete ||
-    Math.hypot(player.position.x - point.x, player.position.z - point.z) > 4
+    Math.hypot(player.position.x - point.x, player.position.z - point.z) > 6
   )
     return false;
-  if (quest.stage === 0) {
-    if (quest.phase === 0) {
-      quest.phase = 1;
-      const item = pickups.find((p) => p.type === "quest");
-      if (item) {
-        clearGroup(item.mesh);
-        pickups.splice(pickups.indexOf(item), 1);
-      }
-      notify("Colheita recolhida. Leva-a ao próximo marcador.");
+  if (contract && mapId === "cidade") {
+    const result = deliverContract(company, contract.id);
+    if (result.ok) {
+      activeContractId = null;
+      changeCompany(result.state);
+      notify(result.message, 6);
       sound("reward");
-    } else {
-      quest.stage = 1;
-      quest.kills = 0;
-      reward(150, "Primeira entrega concluída.");
-      if (enemies.filter((e) => e.health > 0).length < 3)
-        world.enemySpawns.slice(0, 3).forEach((p, i) => addEnemy(p, i));
-    }
-    updateMission();
+      route = [];
+    } else notify(result.message);
+    return true;
+  }
+  if (point.id === "sede" && !player.vehicle) {
+    openCompany(remoteContract ? "contracts" : founded ? "overview" : "story");
     return true;
   }
   return false;
@@ -499,7 +629,10 @@ function interact() {
         0,
         car.position.z - Math.sin(car.yaw) * 2.4 * side,
       );
-      if (!hitBox(point.x, point.z, 0.35)) {
+      if (
+        !hitBox(point.x, point.z, 0.35) &&
+        !carAt(point.x, point.z, 0.35, car)
+      ) {
         exit = point;
         break;
       }
@@ -527,6 +660,7 @@ function interact() {
     }
   }
   updateHud();
+  saveCampaign();
 }
 function reload() {
   if (state !== "playing" || reloadTime > 0 || player.ammo === 12) return;
@@ -548,7 +682,9 @@ function lockMouse() {
 }
 function setState(next) {
   state = next;
+  renderDirty = true;
   document.body.dataset.state = next;
+  $("hud").inert = next === "company";
   keys.clear();
   fireHeld = false;
   dragging = false;
@@ -557,27 +693,37 @@ function setState(next) {
   mousePosition = null;
   touchPosition = null;
   if (next !== "playing") {
+    saveCampaign();
     ownedLock = false;
     if (document.pointerLockElement === canvas) document.exitPointerLock();
   }
+  if (next !== "company") $("company-panel").hidden = true;
   if (audio.motorGain)
     audio.motorGain.gain.setTargetAtTime(0, audio.context.currentTime, 0.05);
 }
 function play() {
   initAudio();
-  if (!started) {
-    started = true;
-    notify("A tua primeira entrega está marcada a dourado no mapa.", 6);
-  } else notify("De volta à cidade.");
+  started = true;
   setState("playing");
   last = performance.now();
+  if (!founded) {
+    notify(
+      "Uma herança, uma empresa por criar. A tua história começa aqui.",
+      6,
+    );
+    openCompany("overview");
+  } else {
+    notify("Bem-vindo de volta. B abre a empresa; E permite interagir.", 5);
+    checkStory();
+  }
 }
 function pause() {
   if (state !== "playing") return;
+  saveCampaign();
   setState("menu");
   $("menu-title").textContent = "A tua cidade espera.";
   $("menu-description").textContent =
-    "Retoma a aventura ou escolhe um novo mapa. Trocar de mapa reinicia as missões desse local.";
+    "A tua empresa e a história ficam guardadas. Explora os territórios ou retoma a cidade.";
   $("play").textContent = "Retomar aventura";
 }
 function addShot(position, direction, enemy = false) {
@@ -594,6 +740,11 @@ function addShot(position, direction, enemy = false) {
 }
 function shoot() {
   if (state !== "playing" || cooldown > 0 || reloadTime > 0) return;
+  if (player.vehicle) {
+    cooldown = 0.5;
+    notify("Sai do veículo para arremessar tomates.");
+    return;
+  }
   if (player.ammo <= 0) {
     reload();
     return;
@@ -647,17 +798,7 @@ function killEnemy(enemy) {
   kills++;
   wanted = Math.min(3, wanted + 0.4);
   quietTime = 0;
-  reward(25, "Rival fora de combate.");
-  if (quest.stage === 1 && !quest.complete) {
-    quest.kills++;
-    if (quest.kills >= 3) {
-      quest.stage = 2;
-      quest.checkpoints = 0;
-      quest.timer = 95;
-      reward(250, "O bairro está seguro.");
-    }
-    updateMission();
-  }
+  notify("Ameaça afastada. Podes continuar o teu percurso.");
   const health = createPickup("health");
   health.position.copy(enemy.position);
   scene.add(health);
@@ -674,7 +815,22 @@ function damage(amount) {
   sound("hit");
   updateHud();
   if (player.health <= 0) {
-    settings.cash = Math.max(0, settings.cash - 50);
+    const fee = Math.min(company.cash, 50);
+    company = {
+      ...company,
+      cash: company.cash - fee,
+      expenses: company.expenses + fee,
+      history: [
+        ...company.history,
+        {
+          day: company.day,
+          title: "Recuperação",
+          body: `Assistência da cooperativa: ${fee} €.`,
+          kind: "expense",
+        },
+      ].slice(-100),
+    };
+    companyView = getCompanyView(company);
     save();
     if (player.vehicle) player.vehicle.speed = 0;
     player.vehicle = null;
@@ -692,7 +848,7 @@ function damage(amount) {
     pitch = 0.24;
     cameraUpdate(0.5, true);
     notify(
-      "A cooperativa levou-te para um lugar seguro. Recuperação: 50 tomates.",
+      "A cooperativa levou-te para um lugar seguro. Recuperação: 50 €.",
       6,
     );
     updateHud();
@@ -704,7 +860,7 @@ function updateHud() {
   $("health").textContent = Math.ceil(player.health);
   $("ammo").textContent = reloadTime > 0 ? "…" : player.ammo;
   $("reserve").textContent = "∞";
-  $("cash").textContent = Math.floor(settings.cash).toLocaleString("pt-PT");
+  $("cash").textContent = Math.floor(company.cash).toLocaleString("pt-PT");
   $("wanted").textContent =
     "★".repeat(Math.ceil(wanted)) +
     "☆".repeat(Math.max(0, 3 - Math.ceil(wanted)));
@@ -807,11 +963,14 @@ function updateEnemies(dt) {
       }
       continue;
     }
+    enemy.actor.group.visible =
+      enemy.position.distanceTo(player.position) < 145;
     const delta = player.position.clone().sub(enemy.position),
       distance = delta.length(),
       visible = distance < 35 && lineClear(enemy.position, player.position);
     let speed = 0;
-    if (distance < 45 && (distance > 9 || !visible)) {
+    const alerted = wanted > 0.7 || (mapId !== "cidade" && distance < 14);
+    if (alerted && distance < 55 && (distance > 9 || !visible)) {
       enemy.navTime -= dt;
       if (!visible && enemy.navTime <= 0) {
         enemy.path = navigation.findPath(enemy.position, player.position);
@@ -835,7 +994,7 @@ function updateEnemies(dt) {
         moveTo(enemy, direction.x * dt * 2.1, direction.z * dt * 2.1, 0.4);
         speed = 2.1;
       }
-    } else if (visible && distance > 4) {
+    } else if (alerted && visible && distance > 4) {
       const factor = Math.sin(time + enemy.phase);
       moveTo(
         enemy,
@@ -848,7 +1007,7 @@ function updateEnemies(dt) {
     enemy.actor.group.rotation.y = Math.atan2(delta.x, delta.z);
     enemy.actor.animate(dt, speed, time, visible);
     enemy.attack -= dt;
-    if (visible && enemy.attack <= 0) {
+    if (alerted && visible && enemy.attack <= 0) {
       const origin = enemy.position.clone().add(new THREE.Vector3(0, 1.4, 0));
       const target = player.position
         .clone()
@@ -875,9 +1034,16 @@ function updateShots(dt) {
     for (let i = 0; i < count && !shot.dead; i++) {
       shot.mesh.position.addScaledVector(shot.velocity, dt / count);
       const p = shot.mesh.position;
-      if (p.y < 0.08 || hitBox(p.x, p.z, 0.08)) {
+      if (p.y < 0.08 || hitBox(p.x, p.z, 0.08, p.y)) {
         shot.dead = true;
         burst(p);
+        break;
+      }
+      const struckCar = p.y > 0.15 && p.y < 1.95 ? carAt(p.x, p.z, 0.12) : null;
+      if (struckCar) {
+        shot.dead = true;
+        burst(p);
+        if (shot.enemy && struckCar === player.vehicle && damage(5)) return;
         break;
       }
       if (shot.enemy) {
@@ -922,47 +1088,14 @@ function updateShots(dt) {
   particles = particles.filter((p) => p.age <= 1);
 }
 function updateQuests(dt) {
-  let point = questPoint();
+  const point = questPoint(),
+    contract = currentContract();
+  const remoteContract = contract && mapId !== "cidade";
   marker.visible = !!point;
   if (point) {
     marker.position.set(point.x, 0, point.z);
     markerBeam.rotation.y += dt;
     markerBeam.position.y = 3.2 + Math.sin(time * 2) * 0.25;
-    markerRing.scale.setScalar(1 + Math.sin(time * 3) * 0.04);
-  }
-  if (
-    quest.stage === 0 &&
-    player.vehicle &&
-    point &&
-    Math.hypot(player.position.x - point.x, player.position.z - point.z) < 4
-  )
-    missionAction();
-  if (quest.stage === 2 && !quest.complete) {
-    quest.timer -= dt;
-    if (quest.timer <= 0) {
-      quest.timer = 95;
-      quest.checkpoints = 0;
-      point = questPoint();
-      notify(
-        "A entrega atrasou-se. O percurso recomeçou. Tenta com um veículo.",
-        5,
-      );
-    }
-    if (
-      player.vehicle &&
-      point &&
-      Math.hypot(player.position.x - point.x, player.position.z - point.z) < 4
-    ) {
-      quest.checkpoints++;
-      sound("reward");
-      notify(`Entrega ${quest.checkpoints} / 3 concluída.`);
-      if (quest.checkpoints >= 3) {
-        quest.complete = true;
-        settings.completed[mapId] = true;
-        reward(500, "Mapa concluído! A cidade é tua.");
-      }
-    }
-    updateMission();
   }
   for (const pickup of pickups) {
     if (pickup.type === "health") {
@@ -984,18 +1117,53 @@ function updateQuests(dt) {
   }
   pickups = pickups.filter((p) => !p.dead);
   let prompt = "";
+  const interactionPoint =
+    point || (remoteContract ? businessLocation("sede") : null);
   if (
-    point &&
-    quest.stage === 0 &&
-    Math.hypot(player.position.x - point.x, player.position.z - point.z) < 4
+    interactionPoint &&
+    Math.hypot(
+      player.position.x - interactionPoint.x,
+      player.position.z - interactionPoint.z,
+    ) < 6
   )
-    prompt =
-      quest.phase === 0 ? "E · Recolher a colheita" : "E · Entregar a colheita";
+    prompt = remoteContract
+      ? player.vehicle
+        ? "E · Sair do veículo · B Empresa"
+        : "E · Empresa / retomar entrega"
+      : contract
+        ? "E · Entregar contrato"
+        : player.vehicle
+          ? "E · Sair do veículo · B Empresa"
+          : "E · Entrar na empresa";
   else if (player.vehicle) prompt = "E · Sair do veículo";
   else if (cars.some((c) => c.position.distanceTo(player.position) < 4.2))
     prompt = "E · Conduzir";
+  else if (remoteContract) prompt = "B · Empresa → Contratos → Retomar entrega";
   $("prompt").textContent = prompt;
   $("prompt").hidden = !prompt;
+  routeTime -= dt;
+  if (remoteContract) {
+    route = [];
+    routeTime = 0;
+  } else if (contract && point && routeTime <= 0) {
+    route = navigation.findPath(player.position, point);
+    routeTime = 5;
+  }
+  while (
+    route.length &&
+    Math.hypot(route[0].x - player.position.x, route[0].z - player.position.z) <
+      7
+  )
+    route.shift();
+  autosaveTime += dt;
+  if (autosaveTime >= 5) {
+    autosaveTime = 0;
+    saveCampaign();
+  }
+  if (storyTime > 0) {
+    storyTime -= dt;
+    if (storyTime <= 0) $("story-toast").hidden = true;
+  }
 }
 function cameraUpdate(dt, instant = false) {
   lookTarget.copy(player.position);
@@ -1015,7 +1183,9 @@ function cameraUpdate(dt, instant = false) {
   for (let t = 0.1; t <= 1; t += 0.05) {
     const x = THREE.MathUtils.lerp(lookTarget.x, cameraDesired.x, t),
       z = THREE.MathUtils.lerp(lookTarget.z, cameraDesired.z, t);
-    if (hitBox(x, z, 0.15)) {
+    if (
+      hitBox(x, z, 0.15, THREE.MathUtils.lerp(lookTarget.y, cameraDesired.y, t))
+    ) {
       cameraDesired.lerpVectors(
         lookTarget,
         cameraDesired,
@@ -1033,52 +1203,85 @@ function cameraUpdate(dt, instant = false) {
   camera.lookAt(cameraTarget);
 }
 function drawMinimap() {
-  const c = $("minimap"),
-    ctx = c.getContext("2d");
+  const canvas = $("minimap"),
+    ctx = canvas.getContext("2d");
   if (!ctx) return;
-  const size = c.width,
-    scale = size / 200,
-    center = size / 2;
+  const size = canvas.width,
+    range = 190,
+    scale = size / range;
+  const origin = {
+    x: player.position.x - range / 2,
+    z: player.position.z - range / 2,
+  };
+  const sx = (x) => (x - origin.x) * scale,
+    sz = (z) => (z - origin.z) * scale;
   ctx.clearRect(0, 0, size, size);
-  ctx.fillStyle = "#18372c";
+  ctx.fillStyle = "#254237";
   ctx.fillRect(0, 0, size, size);
-  ctx.strokeStyle = "#657565";
-  ctx.lineWidth = 9 * scale;
-  for (const road of [-48, 0, 48]) {
-    ctx.beginPath();
-    ctx.moveTo((road + 100) * scale, 0);
-    ctx.lineTo((road + 100) * scale, size);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(0, (road + 100) * scale);
-    ctx.lineTo(size, (road + 100) * scale);
-    ctx.stroke();
-  }
-  ctx.fillStyle = "#a9b098";
-  for (const b of world.colliders)
+  ctx.fillStyle = "#687369";
+  for (const road of world.roads || []) {
+    const rw = road.width || 14,
+      rd = road.depth || 14;
     ctx.fillRect(
-      (b.minX + 100) * scale,
-      (b.minZ + 100) * scale,
+      sx(road.x - rw / 2),
+      sz(road.z - rd / 2),
+      rw * scale,
+      rd * scale,
+    );
+  }
+  ctx.fillStyle = "#a2ac9b";
+  for (const b of world.colliders) {
+    if (
+      b.maxX < origin.x ||
+      b.minX > origin.x + range ||
+      b.maxZ < origin.z ||
+      b.minZ > origin.z + range
+    )
+      continue;
+    ctx.fillRect(
+      sx(b.minX),
+      sz(b.minZ),
       (b.maxX - b.minX) * scale,
       (b.maxZ - b.minZ) * scale,
     );
+  }
+  if (route.length) {
+    ctx.strokeStyle = "#f2c476";
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(sx(player.position.x), sz(player.position.z));
+    for (const p of route) ctx.lineTo(sx(p.x), sz(p.z));
+    ctx.stroke();
+  }
   const dot = (x, z, color, radius) => {
+    const px = sx(x),
+      py = sz(z);
+    if (px < 0 || py < 0 || px > size || py > size) return;
     ctx.fillStyle = color;
     ctx.beginPath();
-    ctx.arc((x + 100) * scale, (z + 100) * scale, radius, 0, Math.PI * 2);
+    ctx.arc(px, py, radius, 0, Math.PI * 2);
     ctx.fill();
   };
-  cars.forEach((c) => dot(c.position.x, c.position.z, "#90c7d3", 2.5));
+  cars.forEach((car) => dot(car.position.x, car.position.z, "#94c6d1", 2.5));
   enemies
     .filter((e) => e.health > 0)
-    .forEach((e) => dot(e.position.x, e.position.z, "#f27454", 2.5));
+    .forEach((e) => dot(e.position.x, e.position.z, "#e77d5c", 2.2));
+  for (const location of world.businessLocations || [])
+    dot(location.x, location.z, "#b3c78e", 2.5);
   const point = questPoint();
-  if (point) dot(point.x, point.z, "#ffd37f", 4);
+  if (point) {
+    const dx = point.x - player.position.x,
+      dz = point.z - player.position.z,
+      length = Math.max(1, Math.hypot(dx, dz));
+    dot(
+      player.position.x + dx * Math.min(1, (range * 0.43) / length),
+      player.position.z + dz * Math.min(1, (range * 0.43) / length),
+      "#ffd37f",
+      4,
+    );
+  }
   ctx.save();
-  ctx.translate(
-    (player.position.x + 100) * scale,
-    (player.position.z + 100) * scale,
-  );
+  ctx.translate(size / 2, size / 2);
   ctx.rotate(-yaw);
   ctx.fillStyle = "#f5f2d8";
   ctx.beginPath();
@@ -1091,7 +1294,18 @@ function drawMinimap() {
   ctx.restore();
   ctx.fillStyle = "#d3ddc9";
   ctx.font = "9px Arial";
-  ctx.fillText("N", center - 3, 11);
+  ctx.fillText("N", size / 2 - 3, 11);
+  const district = (world.districts || []).reduce(
+    (best, item) =>
+      !best ||
+      Math.hypot(item.x - player.position.x, item.z - player.position.z) <
+        Math.hypot(best.x - player.position.x, best.z - player.position.z)
+        ? item
+        : best,
+    null,
+  );
+  $("location").textContent =
+    district?.name || MAPS.find((map) => map.id === mapId).name;
 }
 function update(dt) {
   time += dt;
@@ -1112,6 +1326,10 @@ function update(dt) {
   }
   if (fireHeld) shoot();
   updatePlayer(dt);
+  life?.update(dt, player.position);
+  for (const car of cars)
+    car.actor.group.visible =
+      car === player.vehicle || car.position.distanceTo(player.position) < 240;
   updateEnemies(dt);
   updateShots(dt);
   updateQuests(dt);
@@ -1147,7 +1365,8 @@ function update(dt) {
   minimapTime -= dt;
   if (hudTime <= 0) {
     updateHud();
-    hudTime = 0.12;
+    updateMission();
+    hudTime = 0.2;
   }
   if (minimapTime <= 0) {
     drawMinimap();
@@ -1155,15 +1374,21 @@ function update(dt) {
   }
 }
 function resize() {
+  renderDirty = true;
   renderer.setPixelRatio(
     Math.min(
       devicePixelRatio || 1,
-      settings.quality === "high" ? 1.7 : settings.quality === "low" ? 1 : 1.35,
+      settings.quality === "high"
+        ? 1.5
+        : settings.quality === "low"
+          ? 0.75
+          : 1.0,
     ),
   );
   renderer.setSize(innerWidth, innerHeight);
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
+  visuals.resize(innerWidth, innerHeight);
 }
 function look(dx, dy) {
   yaw -= dx * 0.0025 * settings.sensitivity;
@@ -1242,6 +1467,33 @@ document.addEventListener("pointerlockchange", () => {
 });
 addEventListener("keydown", (event) => {
   const key = event.key.toLowerCase();
+  if (state === "company" && key === "tab") {
+    const controls = [
+      ...$("company-panel").querySelectorAll(
+        'button:not(:disabled),input:not(:disabled),select:not(:disabled),[tabindex="0"]',
+      ),
+    ].filter((item) => item.offsetParent !== null && item.tabIndex !== -1);
+    const first = controls[0],
+      last = controls.at(-1);
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last?.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first?.focus();
+    }
+  }
+  if (event.target.closest?.("input,textarea,select") && key !== "escape")
+    return;
+  if (state === "company") {
+    if (key === "escape" || key === "b") closeCompany();
+    return;
+  }
+  if (key === "b" && state === "playing") {
+    event.preventDefault();
+    openCompany("overview");
+    return;
+  }
   if (
     state === "playing" &&
     [
@@ -1263,7 +1515,7 @@ addEventListener("keydown", (event) => {
   if (event.repeat) return;
   if (key === "escape" || key === "p" || key === "m") {
     if (state === "playing") pause();
-    else if (started && key !== "m") play();
+    else if (state === "menu" && started && key !== "m") play();
   }
   if (key === "e") interact();
   if (key === "r") reload();
@@ -1283,12 +1535,7 @@ $("quality").value = settings.quality;
 $("sensitivity").value = settings.sensitivity;
 $("quality").addEventListener("change", () => {
   settings.quality = $("quality").value;
-  renderer.shadowMap.enabled = settings.quality !== "low";
-  const size = settings.quality === "high" ? 2048 : 1024;
-  sun.shadow.mapSize.set(size, size);
-  sun.shadow.map?.dispose();
-  sun.shadow.map = null;
-  sun.shadow.needsUpdate = true;
+  visuals.setQuality(settings.quality);
   resize();
   save();
 });
@@ -1310,9 +1557,9 @@ muteUI();
 document.querySelectorAll("[data-map]").forEach((button) =>
   button.addEventListener("click", () => {
     resetMap(button.dataset.map);
-    started = false;
+    saveCampaign();
     $("play").textContent = "Entrar na cidade";
-    $("menu-title").textContent = "Uma nova terra. A mesma ambição.";
+    $("menu-title").textContent = "Novos bairros. A mesma empresa.";
     notify("Novo mapa pronto.");
   }),
 );
@@ -1338,16 +1585,170 @@ $("touch-interact").addEventListener("click", interact);
 $("touch-reload").addEventListener("click", reload);
 canvas.addEventListener("webglcontextlost", (event) => {
   event.preventDefault();
-  pause();
+  saveCampaign();
+  setState("menu");
   $("menu-description").textContent =
     "A ligação aos gráficos foi interrompida. Recarrega a página para retomar.";
   $("play").disabled = true;
 });
+companyPanel = createCompanyPanel({
+  getCompany: () => company,
+  setCompany: changeCompany,
+  isFounded: () => founded,
+  foundCompany(next) {
+    founded = true;
+    $("new-campaign").hidden = false;
+    changeCompany(next);
+    checkStory();
+    saveCampaign();
+  },
+  trackContract,
+  close: closeCompany,
+  notify,
+});
+$("open-company").addEventListener("click", () => openCompany("overview"));
+$("new-campaign").addEventListener("click", () => {
+  if (
+    !confirm(
+      "Começar uma nova história substitui a campanha atual neste navegador. Podes exportar o progresso no painel Empresa. Queres recomeçar?",
+    )
+  )
+    return;
+  company = createCompany();
+  companyView = getCompanyView(company);
+  founded = false;
+  activeContractId = null;
+  lastStoryEvent = "";
+  started = false;
+  savedCampaign = null;
+  resetMap("cidade");
+  $("new-campaign").hidden = true;
+  $("play").textContent = "Começar a minha história";
+  saveCampaign();
+  play();
+});
+$("export-save").addEventListener("click", () => {
+  saveCampaign();
+  const snapshot = {
+    version: 3,
+    savedAt: Date.now(),
+    company,
+    founded,
+    mapId,
+    position: { x: player.position.x, z: player.position.z },
+    health: player.health,
+    ammo: player.ammo,
+    yaw,
+    pitch,
+    activeContractId,
+    lastStoryEvent,
+    vehicles: cars.map((c) => ({
+      x: c.position.x,
+      z: c.position.z,
+      yaw: c.yaw,
+    })),
+    driving: player.vehicle ? cars.indexOf(player.vehicle) : -1,
+  };
+  const url = URL.createObjectURL(
+    new Blob([JSON.stringify(snapshot, null, 2)], { type: "application/json" }),
+  );
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `tomato-republic-dia-${company.day}.json`;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  notify("Progresso exportado para um ficheiro JSON.");
+});
+$("import-save")
+  .closest("label")
+  .addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      $("import-save").click();
+    }
+  });
+$("import-save").addEventListener("change", async (event) => {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  try {
+    if (file.size > 2000000) throw new Error("Ficheiro demasiado grande.");
+    const data = JSON.parse(await file.text());
+    if (
+      data?.version !== 3 ||
+      !data.company ||
+      typeof data.company.name !== "string"
+    )
+      throw new Error("Este ficheiro não contém uma campanha válida.");
+    data.company = normalizeCompany(data.company);
+    data.founded = !!data.founded;
+    replacingCampaign = true;
+    localStorage.setItem("tomato-republic-campaign-v3", JSON.stringify(data));
+    location.reload();
+  } catch (error) {
+    replacingCampaign = false;
+    notify(`Não foi possível importar: ${error.message}`);
+  } finally {
+    event.target.value = "";
+  }
+});
+$("story-open").addEventListener("click", () => openCompany("story"));
+addEventListener("pagehide", saveCampaign);
 addEventListener("resize", resize);
 resize();
-resetMap("cidade");
+resetMap(savedCampaign?.mapId || "cidade");
+if (savedCampaign) {
+  const point = savedCampaign.position;
+  if (
+    point &&
+    Number.isFinite(point.x) &&
+    Number.isFinite(point.z) &&
+    !hitBox(point.x, point.z, 0.4)
+  )
+    player.position.set(point.x, 0, point.z);
+  for (let i = 0; i < cars.length; i++) {
+    const saved = savedCampaign.vehicles?.[i];
+    if (
+      saved &&
+      Number.isFinite(saved.x) &&
+      Number.isFinite(saved.z) &&
+      !hitBox(saved.x, saved.z, 1.3)
+    ) {
+      cars[i].position.set(saved.x, 0, saved.z);
+      cars[i].yaw = Number.isFinite(saved.yaw) ? saved.yaw : cars[i].yaw;
+      cars[i].actor.group.rotation.y = cars[i].yaw;
+    }
+  }
+  if (Number.isInteger(savedCampaign.driving) && cars[savedCampaign.driving]) {
+    player.vehicle = cars[savedCampaign.driving];
+    player.position.copy(player.vehicle.position);
+    player.actor.group.visible = false;
+  }
+  player.health = THREE.MathUtils.clamp(
+    Number(savedCampaign.health) || 100,
+    1,
+    100,
+  );
+  player.ammo = THREE.MathUtils.clamp(
+    Number.isFinite(savedCampaign.ammo) ? savedCampaign.ammo : 12,
+    0,
+    12,
+  );
+  yaw = Number.isFinite(savedCampaign.yaw) ? savedCampaign.yaw : 0;
+  pitch = THREE.MathUtils.clamp(
+    Number.isFinite(savedCampaign.pitch) ? savedCampaign.pitch : 0.24,
+    -0.12,
+    1.05,
+  );
+  player.actor.group.position.copy(player.position);
+  cameraUpdate(0.5, true);
+  $("play").textContent = "Continuar a minha história";
+}
+initialized = true;
+$("new-campaign").hidden = !founded;
 setState("menu");
 drawMinimap();
+updateMission();
+updateHud();
 if (new URLSearchParams(location.search).has("diagnostics")) {
   Object.defineProperty(window, "tomatoDiagnostics", {
     value: Object.freeze({
@@ -1376,9 +1777,23 @@ if (new URLSearchParams(location.search).has("diagnostics")) {
           z: e.position.z,
           health: e.health,
         })),
-        quest: { ...quest },
+        company: JSON.parse(JSON.stringify(company)),
+        founded,
+        activeContractId,
+        locations: (world.businessLocations || []).map((item) => ({ ...item })),
+        districts: (world.districts || []).map((item) => ({ ...item })),
+        worldStats: { ...world.stats },
+        life: {
+          vehicles: life?.vehicles.length || 0,
+          pedestrians: life?.pedestrians.length || 0,
+          traffic: (life?.vehicles || []).slice(0, 4).map((car) => ({
+            x: car.position.x,
+            z: car.position.z,
+            speed: car.speed,
+          })),
+        },
         kills,
-        cash: settings.cash,
+        cash: company.cash,
         renderer: {
           calls: renderer.info.render.calls,
           triangles: renderer.info.render.triangles,
@@ -1392,10 +1807,13 @@ function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.1, Math.max(0, (now - last) / 1000));
   last = now;
-  if (state === "playing" && !transitioning) update(dt);
-  else if (!started) {
-    cameraUpdate(dt);
-  }
-  renderer.render(scene, camera);
+  if (state === "playing" && !transitioning) {
+    update(dt);
+    world?.update?.(time, player.position);
+  } else if (!renderDirty) return;
+  if (!started) cameraUpdate(dt);
+  visuals.update(dt, player.position, company.day);
+  visuals.render();
+  renderDirty = false;
 }
 requestAnimationFrame(frame);

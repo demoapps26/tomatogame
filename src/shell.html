@@ -9,7 +9,7 @@
     <meta name="theme-color" content="#16201a" />
     <meta
       name="description"
-      content="Tomato Republic: explora a cidade, conduz pelas ruas e constrói o teu império do tomate."
+      content="Tomato Republic: herda uma estufa, funda uma empresa e decide o futuro de uma cidade que vive do tomate."
     />
     <title>Tomato Republic — A cidade é tua.</title>
     <link rel="stylesheet" href="style.css" />
@@ -28,23 +28,26 @@
           >
           <div class="edition">
             <span class="status-dot"></span> UM NOVO TERRITÓRIO
-            <span class="edition-number">VOL. 01</span>
+            <span class="edition-number">VOL. 03</span>
           </div>
         </header>
         <div class="menu-content">
           <div class="intro">
-            <p class="eyebrow"><span></span> CULTIVADO PARA A LIBERDADE</p>
+            <p class="eyebrow">
+              <span></span> UMA CIDADE. UMA HERANÇA. AS TUAS DECISÕES.
+            </p>
             <h1 id="menu-title">
-              A cidade é tua.<br /><em>Faz crescer o império.</em>
+              De uma pequena raiz<br /><em>a uma grande história.</em>
             </h1>
             <p id="menu-description">
-              Das ruas à estufa, cada esquina é uma oportunidade. Explora,
-              conduz e conquista o teu lugar num mundo onde o tomate é poder.
+              Herdaste uma estufa e uma promessa por cumprir. Funda a tua
+              empresa, percorre a cidade e decide que futuro vais cultivar. Cada
+              contrato, cada investimento e cada escolha deixam uma marca.
             </p>
           </div>
           <div class="territory-heading">
             <h2>Escolhe o teu território</h2>
-            <span>03 MAPAS · MUNDO EXPLORÁVEL</span>
+            <span>CIDADE · CAMPO · PORTO</span>
           </div>
           <div class="map-grid" role="group" aria-label="Escolher mapa">
             <button
@@ -61,7 +64,7 @@
               >
               <span class="map-info"
                 ><strong>Santa Tomata</strong
-                ><small>Ruas, praças e novas oportunidades</small
+                ><small>Bairros, negócios e uma história por escrever</small
                 ><span class="map-tag">CIDADE COSTEIRA</span></span
               >
             </button>
@@ -108,11 +111,14 @@
             <button id="play" class="primary-button" type="button">
               Entrar na cidade <span aria-hidden="true">↗</span>
             </button>
+            <button id="new-campaign" class="new-campaign" type="button" hidden>
+              Nova história
+            </button>
             <div class="session-detail">
               <span class="status-dot"></span
               ><span
                 >O teu território, ao teu ritmo.<small
-                  >TERCEIRA PESSOA · EXPLORAÇÃO LIVRE</small
+                  >EXPLORAÇÃO · HISTÓRIA · GESTÃO</small
                 ></span
               >
             </div>
@@ -157,7 +163,7 @@
         <footer class="menu-footer">
           <span>PROTÓTIPO JOGÁVEL · 1 JOGADOR</span
           ><span>SEM PRESSA. SEM LIMITES PARA A IMAGINAÇÃO.</span
-          ><span class="footer-build">TOMATO REPUBLIC <i>01</i></span>
+          ><span class="footer-build">TOMATO REPUBLIC <i>03</i></span>
         </footer>
       </section>
 
@@ -170,11 +176,20 @@
           </div>
           <div class="finance">
             <span id="wanted" aria-label="Nível de alerta">☆☆☆☆☆</span>
-            <div class="cash-balance" aria-label="Saldo em tomates">
-              <span class="currency-mark" aria-hidden="true"><i></i></span
+            <div class="cash-balance" aria-label="Saldo da empresa em euros">
+              <span class="euro-mark" aria-hidden="true">€</span
               ><strong id="cash">0</strong>
             </div>
           </div>
+          <button
+            id="open-company"
+            class="open-company"
+            type="button"
+            aria-label="Abrir a empresa, tecla B"
+          >
+            <span class="company-button-icon" aria-hidden="true"></span
+            ><span>Empresa</span><kbd>B</kbd>
+          </button>
           <button id="pause" type="button" aria-label="Pausar jogo">
             <span></span><span></span>
           </button>
@@ -240,7 +255,8 @@
           ><span><kbd>CLIQUE</kbd> Atirar</span
           ><span><kbd>E</kbd> Interagir / conduzir</span
           ><span><kbd>ESPAÇO</kbd> Correr / travão</span
-          ><span><kbd>M</kbd> Mapas</span><span><kbd>ESC</kbd> Pausa</span>
+          ><span><kbd>B</kbd> Empresa</span><span><kbd>M</kbd> Mapas</span
+          ><span><kbd>ESC</kbd> Pausa</span>
         </div>
         <div id="touch-controls" aria-label="Controlos táteis">
           <div class="touch-pad">
@@ -272,6 +288,319 @@
               E</button
             ><button id="touch-fire" type="button">ATIRAR</button>
           </div>
+        </div>
+      </section>
+
+      <aside
+        id="story-toast"
+        class="story-toast"
+        hidden
+        aria-label="Nova mensagem da história"
+      >
+        <div class="story-toast-avatar" aria-hidden="true">R</div>
+        <div>
+          <span id="story-speaker">Rosa · Cooperativa</span>
+          <p id="story-text">
+            Uma empresa começa com uma decisão. A cidade está à tua espera.
+          </p>
+        </div>
+        <button id="story-open" type="button">
+          Abrir empresa <span aria-hidden="true">↗</span>
+        </button>
+      </aside>
+
+      <section
+        id="company-panel"
+        hidden
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="company-title"
+        tabindex="-1"
+      >
+        <div class="company-window">
+          <header class="company-header">
+            <div class="company-header-brand">
+              <span class="company-seal" aria-hidden="true"
+                >R<span>·</span>S</span
+              >
+              <div>
+                <p class="company-eyebrow">O TEU PRÓXIMO CAPÍTULO</p>
+                <h2 id="company-title">Raiz &amp; Sol</h2>
+                <p id="company-subtitle">
+                  Uma empresa com raízes. Um futuro por decidir.
+                </p>
+              </div>
+            </div>
+            <div class="company-header-actions">
+              <span id="save-state" class="save-state"
+                ><i></i> Progresso local</span
+              ><button
+                id="close-company"
+                type="button"
+                aria-label="Fechar empresa e voltar à cidade"
+              >
+                <span aria-hidden="true">×</span>
+              </button>
+            </div>
+          </header>
+          <div class="company-layout">
+            <aside class="company-sidebar">
+              <div class="company-day-card">
+                <span>NO TERRENO DESDE O PRIMEIRO DIA</span
+                ><strong>Dia <b id="company-day">1</b></strong
+                ><small id="company-chapter">Capítulo I · As raízes</small>
+              </div>
+              <nav
+                class="company-tabs"
+                role="tablist"
+                aria-label="Áreas da empresa"
+                aria-orientation="vertical"
+              >
+                <button
+                  id="company-tab-overview"
+                  type="button"
+                  data-company-tab="overview"
+                  role="tab"
+                  aria-controls="company-page-overview"
+                  aria-selected="true"
+                >
+                  <span aria-hidden="true">01</span>Visão geral<i
+                    aria-hidden="true"
+                    >↗</i
+                  >
+                </button>
+                <button
+                  id="company-tab-story"
+                  type="button"
+                  data-company-tab="story"
+                  role="tab"
+                  aria-controls="company-page-story"
+                  aria-selected="false"
+                >
+                  <span aria-hidden="true">02</span>História e decisões<i
+                    aria-hidden="true"
+                    >↗</i
+                  >
+                </button>
+                <button
+                  id="company-tab-contracts"
+                  type="button"
+                  data-company-tab="contracts"
+                  role="tab"
+                  aria-controls="company-page-contracts"
+                  aria-selected="false"
+                >
+                  <span aria-hidden="true">03</span>Contratos<i
+                    aria-hidden="true"
+                    >↗</i
+                  >
+                </button>
+                <button
+                  id="company-tab-upgrades"
+                  type="button"
+                  data-company-tab="upgrades"
+                  role="tab"
+                  aria-controls="company-page-upgrades"
+                  aria-selected="false"
+                >
+                  <span aria-hidden="true">04</span>Crescimento<i
+                    aria-hidden="true"
+                    >↗</i
+                  >
+                </button>
+                <button
+                  id="company-tab-ledger"
+                  type="button"
+                  data-company-tab="ledger"
+                  role="tab"
+                  aria-controls="company-page-ledger"
+                  aria-selected="false"
+                >
+                  <span aria-hidden="true">05</span>Diário da empresa<i
+                    aria-hidden="true"
+                    >↗</i
+                  >
+                </button>
+              </nav>
+              <dl class="company-sidebar-stats">
+                <div>
+                  <dt>Tesouraria</dt>
+                  <dd id="company-cash">—</dd>
+                </div>
+                <div>
+                  <dt>Dívida</dt>
+                  <dd id="company-debt">—</dd>
+                </div>
+                <div>
+                  <dt>Em armazém</dt>
+                  <dd id="company-stock">—</dd>
+                </div>
+                <div>
+                  <dt>Reputação</dt>
+                  <dd id="company-reputation">—</dd>
+                </div>
+              </dl>
+              <div class="company-save-tools">
+                <button id="export-save" type="button">
+                  Exportar progresso</button
+                ><label for="import-save" tabindex="0" role="button"
+                  >Importar progresso<input
+                    id="import-save"
+                    type="file"
+                    accept="application/json,.json"
+                    hidden
+                /></label>
+              </div>
+              <div class="company-sidebar-note">
+                <span class="brand-symbol" aria-hidden="true"><i></i></span>
+                <p>O que fazes pela empresa<br />também muda a cidade.</p>
+              </div>
+            </aside>
+            <div class="company-main">
+              <section
+                id="company-page-overview"
+                class="company-page"
+                data-company-page="overview"
+                role="tabpanel"
+                aria-labelledby="company-tab-overview"
+              >
+                <div class="company-page-heading">
+                  <p class="company-eyebrow">CULTIVAR O AMANHÃ</p>
+                  <h3>
+                    Todas as grandes histórias<br />começam com uma semente.
+                  </h3>
+                  <p>
+                    Acompanha o negócio, conhece as pessoas e escolhe o próximo
+                    passo.
+                  </p>
+                </div>
+                <form id="company-found-form" class="company-found-form">
+                  <div>
+                    <label for="company-name"
+                      >Como se vai chamar a tua empresa?</label
+                    >
+                    <p>
+                      Dá um nome à herança que recebeste e começa a escrever a
+                      tua história.
+                    </p>
+                  </div>
+                  <div class="company-name-row">
+                    <input
+                      id="company-name"
+                      name="companyName"
+                      maxlength="32"
+                      minlength="2"
+                      value="Raiz &amp; Sol"
+                      required
+                      autocomplete="organization"
+                      aria-describedby="company-name-help"
+                    /><button class="company-action" type="submit">
+                      Fundar a empresa <span aria-hidden="true">↗</span>
+                    </button>
+                  </div>
+                  <small id="company-name-help"
+                    >O nome fica guardado com o progresso deste jogo.</small
+                  >
+                </form>
+                <div id="company-summary" class="company-content">
+                  <div class="company-empty">
+                    <span class="company-empty-art" aria-hidden="true">❧</span>
+                    <h4>Há muito por cultivar.</h4>
+                    <p>
+                      As contas, os objetivos e o estado da tua empresa vão
+                      aparecer aqui.
+                    </p>
+                  </div>
+                </div>
+              </section>
+              <section
+                id="company-page-story"
+                class="company-page"
+                data-company-page="story"
+                role="tabpanel"
+                aria-labelledby="company-tab-story"
+                hidden
+              >
+                <div class="company-page-heading">
+                  <p class="company-eyebrow">AS PESSOAS POR TRÁS DA COLHEITA</p>
+                  <h3>O teu rumo.<br />As tuas consequências.</h3>
+                  <p>
+                    O dinheiro conta. A confiança, a qualidade e a terra também.
+                  </p>
+                </div>
+                <div id="company-story" class="company-content"></div>
+              </section>
+              <section
+                id="company-page-contracts"
+                class="company-page"
+                data-company-page="contracts"
+                role="tabpanel"
+                aria-labelledby="company-tab-contracts"
+                hidden
+              >
+                <div class="company-page-heading">
+                  <p class="company-eyebrow">DA TERRA À CIDADE</p>
+                  <h3>Negócios que saem<br />do papel.</h3>
+                  <p>
+                    Aceita contratos e leva a tua colheita aos destinos na
+                    cidade.
+                  </p>
+                </div>
+                <div id="company-contracts" class="company-content"></div>
+              </section>
+              <section
+                id="company-page-upgrades"
+                class="company-page"
+                data-company-page="upgrades"
+                role="tabpanel"
+                aria-labelledby="company-tab-upgrades"
+                hidden
+              >
+                <div class="company-page-heading">
+                  <p class="company-eyebrow">CRESCER COM INTENÇÃO</p>
+                  <h3>Investe nas raízes.<br />Colhe o futuro.</h3>
+                  <p>
+                    Mais produção, melhores condições e novos caminhos para o
+                    negócio.
+                  </p>
+                </div>
+                <div id="company-upgrades" class="company-content"></div>
+              </section>
+              <section
+                id="company-page-ledger"
+                class="company-page"
+                data-company-page="ledger"
+                role="tabpanel"
+                aria-labelledby="company-tab-ledger"
+                hidden
+              >
+                <div class="company-page-heading">
+                  <p class="company-eyebrow">MEMÓRIA DE UMA EMPRESA</p>
+                  <h3>Cada escolha deixa<br />uma história.</h3>
+                  <p>
+                    Consulta as decisões, os movimentos e os relatórios de cada
+                    dia.
+                  </p>
+                </div>
+                <div id="company-ledger" class="company-content"></div>
+              </section>
+            </div>
+          </div>
+          <footer class="company-footer">
+            <div>
+              <span class="company-footer-sun" aria-hidden="true">☀</span>
+              <p>
+                <strong>O amanhã é uma decisão.</strong
+                ><span
+                  >Encerrar o dia avança a produção e contabiliza salários,
+                  encargos e juros.</span
+                >
+              </p>
+            </div>
+            <button id="next-day" class="company-action" type="button">
+              Encerrar o dia <span aria-hidden="true">→</span>
+            </button>
+          </footer>
         </div>
       </section>
       <noscript

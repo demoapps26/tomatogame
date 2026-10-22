@@ -1,9 +1,9 @@
 {
   "name": "tomato-republic",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "private": true,
-  "description": "An original single-player tomato action sandbox with three maps, driving and missions",
+  "description": "An entrepreneurial open-world tomato story with a city, consequential choices, company management and driving",
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "build": "node scripts/build.mjs",
