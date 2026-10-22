@@ -1,6 +1,6 @@
 # Tomato Republic: da campanha empresarial à produção comercial
 
-A versão 0.4 acrescenta locais visitáveis e operações empresariais durante a exploração. A base continua em desenvolvimento: escala e qualidade de produção exigem trabalho continuado de arte, design, engenharia e testes com jogadores.
+A versão 0.5 acrescenta materiais fotográficos e iluminação HDR aos locais visitáveis e à campanha empresarial. A base continua em desenvolvimento: escala e qualidade de produção exigem trabalho continuado de arte, design, engenharia e testes com jogadores.
 
 ## Implementado
 
@@ -16,7 +16,9 @@ A versão 0.4 acrescenta locais visitáveis e operações empresariais durante a
 - Frota de até três carrinhas com motoristas, rotas visíveis, custos e pagamentos após a viagem.
 - Stock real na loja, vendas durante a exploração e operações guardadas a meio.
 - Campanha guardada, exportação/importação e nova história.
-- Céu atmosférico, reflexos, materiais com relevo, sombras e oclusão ambiente em qualidade alta.
+- Sete materiais fotográficos PBR CC0, ambiente HDR, sombras próximas, GTAO e MSAA no modo Realismo.
+- Escala consistente dos materiais, detalhe de fachadas e proporções revistas nos objetos da loja e estufa.
+- Cabeças digitalizadas com pele fotográfica e créditos de autoria incluídos no menu.
 - Testes de economia, narrativa, gravação e navegação; verificações funcionais no navegador.
 
 ## Próximo salto de conteúdo

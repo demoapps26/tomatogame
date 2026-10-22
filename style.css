@@ -536,6 +536,36 @@ h1 em {
   color: #7e947f;
   margin-top: 7px;
 }
+#asset-credits {
+  width: min(530px, calc(100vw - 32px));
+  max-height: 82vh;
+  padding: 30px;
+  overflow-y: auto;
+  color: #26382d;
+  background: #f0eee3;
+  border: 1px solid #9ba58e;
+  border-radius: 5px;
+  box-shadow: 0 20px 80px #0008;
+}
+#asset-credits::backdrop {
+  background: #101c14b8;
+}
+#asset-credits h2 {
+  margin: 0 0 22px;
+  font-size: 24px;
+}
+#asset-credits p {
+  margin: 16px 0;
+  font-size: 14px;
+  line-height: 1.6;
+}
+#asset-credits a {
+  color: #315f43;
+  text-decoration: underline;
+}
+#asset-credits .primary-button {
+  margin-top: 12px;
+}
 .settings {
   display: flex;
   align-items: center;

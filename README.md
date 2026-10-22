@@ -1,6 +1,6 @@
 # Tomato Republic — Uma cidade, uma empresa, um legado 🍅
 
-**Versão 0.4.** Um jogo original para um jogador que junta exploração em terceira pessoa, condução e gestão de uma empresa de tomates. Herdaste a pequena estufa de Anselmo, a última colheita e uma dívida de 5 000 €. Agora podes entrar na loja e na estufa, cuidar da colheita, negociar presencialmente e construir uma frota que trabalha enquanto exploras a cidade.
+**Versão 0.5.** Um jogo original para um jogador que junta exploração em terceira pessoa, condução e gestão de uma empresa de tomates. Esta versão melhora a imagem com materiais fotográficos, iluminação de ambiente HDR e mais detalhe próximo. Herdaste a pequena estufa de Anselmo, a última colheita e uma dívida de 5 000 €. Podes entrar na loja e na estufa, cuidar da colheita, negociar presencialmente e construir uma frota que trabalha enquanto exploras a cidade.
 
 ## Jogar
 
@@ -82,9 +82,15 @@ Em **Empresa**, **Exportar progresso** cria um ficheiro JSON. **Importar progres
 
 ## Imagem e desempenho
 
-A versão inclui céu atmosférico com nuvens, luz solar, sombras próximas, reflexos do ambiente, materiais com relevo e rugosidade, detalhe de fachadas e ocultação de pormenores à distância. O modo **Alta** acrescenta oclusão ambiente e gradação de cor subtil. As personagens e veículos têm superfícies de pele, roupa, pintura e poeira mais variadas.
+A versão usa **sete conjuntos de materiais fotográficos CC0**, com cor, normal OpenGL e rugosidade em 1K: asfalto, betão, reboco, solo, madeira, cerâmica e tecido. Os três canais mantêm a mesma escala em metros nas fachadas e no pavimento, incluindo edifícios instanciados.
 
-A arte é procedural e procura um aspeto mais natural. Ainda não é uma produção fotorealista com modelos digitalizados, animações capturadas e desempenho certificado em equipamento físico. O projeto continua em desenvolvimento.
+O ambiente HDR **Rooitou Park**, da Poly Haven, fornece iluminação e reflexos fotográficos. A luz solar acompanha a direção da fotografia; as sombras próximas têm maior resolução. O mapeamento de tons AgX preserva melhor o detalhe de materiais claros e metal pintado. A loja tem cerâmica de 60 cm e equipamento mais detalhado; fachadas ganham caleiras, tubos e caixilharias. Comida, bancas e plantas têm proporções revistas.
+
+As personagens usam uma cabeça digitalizada com textura fotográfica e mapa de relevo, adaptada do modelo **Infinite, de Lee Perry-Smith**, sob licença **CC BY 3.0**. O scan mantém a expressão fixa e os olhos fechados do original; ainda não há animação facial. Os créditos estão disponíveis no menu, incluindo na distribuição de um único HTML.
+
+O modo **Realismo** acrescenta oclusão de contacto GTAO e antialiasing MSAA de até quatro amostras, conforme o suporte do equipamento. É a predefinição para novas preferências; as escolhas de qualidade anteriores são preservadas. **Equilibrada** e **Desempenho** reduzem o custo de renderização. Os materiais estão incorporados no HTML: o ficheiro é maior, mas continua sem downloads durante a partida.
+
+A cidade e os corpos das personagens continuam procedurais. Esta versão melhora as superfícies, os rostos e a luz, mas ainda não é uma produção fotorealista com cenários digitalizados, captura de movimento e desempenho certificado em equipamento físico. As fontes e licenças dos recursos fotográficos estão em [ATTRIBUTIONS.md](ATTRIBUTIONS.md).
 
 ## Desenvolver
 
@@ -114,10 +120,13 @@ O build gera o **index.html** autónomo da raiz e as cópias em `dist/`. A vers�
 - `src/world.js`: territórios, materiais, locais de negócio e expansão da sede.
 - `src/life.js`: tráfego e peões.
 - `src/graphics.js`: céu, iluminação, reflexos e modos de imagem.
+- `src/material-library.js`: projeção física dos materiais fotográficos.
+- `src/photo-assets.js`: recursos incorporados, carregamento e partilha de texturas.
+- `src/scanned-head.js`: adaptação do modelo digitalizado e materiais de pele.
 - `src/actors.js`: personagens, veículos e animações.
 - `src/navigation.js`: procura de caminhos.
 - `src/shell.html` e `style.css`: interface.
 
 Os testes cobrem decisões divergentes, duas campanhas completas, desfechos dependentes de entregas, contratos sem pagamentos duplicados, custos, prazos, investimentos, restauro e navegação. `?diagnostics` disponibiliza uma cópia de leitura do estado em `window.tomatoDiagnostics.snapshot()` para diagnóstico.
 
-Three.js tem licença MIT, incluída em `THIRD_PARTY_NOTICES.txt` e no HTML. Os mapas, texturas e modelos são gerados localmente; não há recursos de GTA ou Counter-Strike.
+Three.js tem licença MIT, incluída em `THIRD_PARTY_NOTICES.txt` e no HTML. Os materiais fotográficos e o HDR têm licença CC0, com proveniência e hashes em `assets/photo-manifest.json`. A cabeça digitalizada tem licença CC BY 3.0, com originais e atribuição em `assets/head-scan/`. Para atualizar os bytes incorporados após alterar um recurso original, executa `node scripts/pack-photo-assets.mjs` e `node scripts/pack-head-scan.mjs` antes do build. A cidade e os corpos são procedurais; não há recursos de GTA ou Counter-Strike.

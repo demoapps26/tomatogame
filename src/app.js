@@ -20,11 +20,13 @@ import { advanceOperations, getOperationsView } from "./operations.js";
 import { createDrivingCamera } from "./driving-camera.js";
 import { createFleet } from "./fleet.js";
 import { createVenues } from "./venues.js";
+import { photoAssetsReady, getPhotoAssetState } from "./photo-assets.js";
+import { scannedHeadsReady, getScannedHeadState } from "./scanned-head.js";
 
 const $ = (id) => document.getElementById(id);
 const canvas = $("view");
 const settings = {
-  quality: "medium",
+  quality: "high",
   sensitivity: 1,
   muted: false,
   cash: 0,
@@ -37,7 +39,7 @@ try {
   );
 } catch {}
 if (!["low", "medium", "high"].includes(settings.quality))
-  settings.quality = "medium";
+  settings.quality = "high";
 settings.sensitivity = THREE.MathUtils.clamp(
   Number(settings.sensitivity) || 1,
   0.5,
@@ -1672,12 +1674,21 @@ document.addEventListener("visibilitychange", () => {
 });
 $("play").addEventListener("click", play);
 $("pause").addEventListener("click", pause);
+$("open-asset-credits").addEventListener("click", () => {
+  $("asset-credits").showModal();
+});
+$("asset-credits").addEventListener("keydown", (event) =>
+  event.stopPropagation(),
+);
 $("quality").value = settings.quality;
 $("sensitivity").value = settings.sensitivity;
 $("quality").addEventListener("change", () => {
   settings.quality = $("quality").value;
   visuals.setQuality(settings.quality);
   resize();
+  Promise.resolve(visuals.ready).then(() => {
+    renderDirty = true;
+  });
   save();
 });
 $("sensitivity").addEventListener("input", () => {
@@ -1897,6 +1908,12 @@ updateHud();
 if (new URLSearchParams(location.search).has("diagnostics")) {
   Object.defineProperty(window, "tomatoDiagnostics", {
     value: Object.freeze({
+      graphicsReady: () =>
+        Promise.all([
+          photoAssetsReady(),
+          scannedHeadsReady(),
+          visuals.ready,
+        ]).then(() => getPhotoAssetState()),
       snapshot: () => ({
         state,
         mapId,
@@ -1960,6 +1977,9 @@ if (new URLSearchParams(location.search).has("diagnostics")) {
         kills,
         cash: company.cash,
         renderer: {
+          quality: settings.quality,
+          photographicAssets: getPhotoAssetState(),
+          scannedHead: getScannedHeadState(),
           calls: renderer.info.render.calls,
           triangles: renderer.info.render.triangles,
         },
@@ -1982,3 +2002,14 @@ function frame(now) {
   renderDirty = false;
 }
 requestAnimationFrame(frame);
+Promise.all([photoAssetsReady(), scannedHeadsReady(), visuals.ready])
+  .then(() => {
+    renderDirty = true;
+  })
+  .catch((error) => {
+    renderDirty = true;
+    console.error(
+      "Não foi possível preparar todos os materiais do cenário.",
+      error,
+    );
+  });

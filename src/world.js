@@ -1,4 +1,6 @@
 import * as THREE from "three";
+import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
+import { applyPhotographicMaterial } from "./material-library.js";
 
 export const MAPS = [
   {
@@ -27,8 +29,8 @@ export const MAPS = [
   },
 ];
 
-// Everything is generated locally. Shared, spatially batched geometry keeps a
-// kilometre-wide city affordable without fetching meshes, images or textures.
+// Shared, spatially batched geometry and embedded CC0 photographic surfaces
+// keep the city self-contained while preserving detail at a human scale.
 export function buildWorld(scene, mapId = "cidade", quality = "medium") {
   const config = MAPS.find((map) => map.id === mapId) || MAPS[0];
   const city = config.id === "cidade",
@@ -317,9 +319,9 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
     white: material({ color: "#e8e7d9", roughness: 0.77 }),
     ochre: material({ color: "#c99d49", roughness: 0.77, metalness: 0.13 }),
     window: physical({
-      color: "#779092",
-      roughness: 0.17,
-      metalness: 0.62,
+      color: "#91a6aa",
+      roughness: 0.12,
+      metalness: 0.13,
       clearcoat: 0.8,
       clearcoatRoughness: 0.11,
       envMapIntensity: 1.2,
@@ -351,6 +353,9 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
       emissiveIntensity: 0.15,
       roughness: 0.4,
     }),
+    grout: material({ color: "#a09e93", roughness: 0.94 }),
+    trim: material({ color: "#8b8d82", roughness: 0.74, metalness: 0.08 }),
+    floor: material({ color: "#e2ddd0", roughness: 0.67 }),
   };
   // Alpha-tested leaf clusters give crowns a broken natural silhouette instead
   // of solid low-poly balls. One atlas and a handful of cards are shared by all
@@ -448,6 +453,32 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
     ["steel", 2],
   ])
     worldSurface(mats[name], tile);
+  // The image files are bundled into the release HTML. Triplanar sampling uses
+  // metres for colour, roughness and normals, including non-uniform instances.
+  for (const [name, kind, meters, strength, roughness] of [
+    ["asphalt", "asphalt", 3.4, 0.38, 0.94],
+    ["stone", "concrete", 2.4, 0.26, 0.88],
+    ["plaster", "plaster", 2.2, 0.28, 0.87],
+    ["concrete", "concrete", 3.0, 0.35, 0.9],
+    ["soil", "soil", 2.0, 0.55, 0.98],
+    ["wood", "wood", 1.5, 0.25, 0.76],
+    ["floor", "tiles", 3.6, 0.17, 0.72],
+  ]) {
+    applyPhotographicMaterial(mats[name], kind, {
+      meters,
+      normalStrength: strength,
+      roughness,
+      color: ["asphalt", "wood", "floor"].includes(name)
+        ? "#ffffff"
+        : undefined,
+    });
+    for (const texture of [
+      mats[name].map,
+      mats[name].normalMap,
+      mats[name].roughnessMap,
+    ])
+      if (texture) textures.add(texture);
+  }
   mats.water.normalMap = surfaces.asphalt.normalMap.clone();
   textures.add(mats.water.normalMap);
   // One alpha-tested facade proxy supplies distant windows after the real
@@ -534,6 +565,17 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
   }
   const box = (m, x, y, z, sx, sy, sz, yaw = 0, color = null) =>
     instance(boxGeo, m, x, y, z, sx, sy, sz, yaw, color);
+  const roundedBoxes = new Map();
+  function bevelBox(m, x, y, z, width, height, depth, radius = 0.02, yaw = 0) {
+    if (low) return box(m, x, y, z, width, height, depth, yaw);
+    const key = `${width}:${height}:${depth}:${radius}`;
+    let shape = roundedBoxes.get(key);
+    if (!shape) {
+      shape = geometry(new RoundedBoxGeometry(width, height, depth, 2, radius));
+      roundedBoxes.set(key, shape);
+    }
+    instance(shape, m, x, y, z, 1, 1, 1, yaw);
+  }
   const cyl = (m, x, y, z, r, height, color = null) =>
     instance(cylinderGeo, m, x, y, z, r, height, r, 0, color);
   const orb = (m, x, y, z, sx, sy, sz, color = null) =>
@@ -807,9 +849,9 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
       x - 0.29 * size,
       1.15 * size,
       z + 0.2 * size,
-      0.12 * size,
-      0.11 * size,
-      0.12 * size,
+      0.05 * size,
+      0.046 * size,
+      0.05 * size,
     );
     instance(
       sphereGeo,
@@ -817,9 +859,9 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
       x + 0.25 * size,
       1.52 * size,
       z + 0.18 * size,
-      0.14 * size,
-      0.12 * size,
-      0.14 * size,
+      0.058 * size,
+      0.052 * size,
+      0.058 * size,
     );
   }
   function building(
@@ -974,6 +1016,51 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
     const windowWidth = modern ? 2.1 : 1.45,
       windowHeight = modern ? 2.05 : 1.7;
     detailLevel = 1;
+    // Drainage, sill shadows and narrow foundation courses break the perfect
+    // cardboard silhouette without retaining tiny pieces on distant buildings.
+    for (const side of [-1, 1]) {
+      const cornerX = x + side * (width * 0.5 - 0.35),
+        frontZ = z + depth * 0.5 + 0.18;
+      cyl(
+        mats.trim,
+        cornerX,
+        height * 0.49,
+        frontZ,
+        0.045,
+        Math.max(1, height - 0.2),
+      );
+      box(
+        mats.trim,
+        x,
+        height - 0.03,
+        z + side * (depth * 0.5 + 0.15),
+        width + 0.2,
+        0.12,
+        0.15,
+      );
+      box(
+        mats.trim,
+        x,
+        0.17,
+        z + side * (depth * 0.5 + 0.08),
+        width + 0.16,
+        0.13,
+        0.1,
+        0,
+        "#777b70",
+      );
+      box(
+        mats.trim,
+        x + side * (width * 0.5 + 0.08),
+        0.17,
+        z,
+        0.1,
+        0.13,
+        depth + 0.16,
+        0,
+        "#777b70",
+      );
+    }
     for (let floor = 0; floor < floors; floor++) {
       const y = 2.1 + floor * 3.1;
       if (y + windowHeight * 0.5 > height - 0.35) continue;
@@ -1018,6 +1105,29 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
               0.12,
               0.3,
             );
+            box(
+              mats.trim,
+              wx,
+              y + windowHeight / 2 + 0.1,
+              wz + side * 0.09,
+              windowWidth + 0.27,
+              0.1,
+              0.11,
+              0,
+              "#c8c7b9",
+            );
+            for (const edge of [-1, 1])
+              box(
+                mats.trim,
+                wx + edge * (windowWidth / 2 + 0.07),
+                y,
+                wz + side * 0.095,
+                0.075,
+                windowHeight + 0.12,
+                0.09,
+                0,
+                "#bcbdb1",
+              );
           }
           if (!modern && !industrial && !low) {
             for (const sx of [-1, 1])
@@ -1078,6 +1188,31 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
             0.12,
             windowWidth + 0.4,
           );
+          if (!low && floor === 0 && col % 3 === 0) {
+            // Wall-mounted outdoor condensers use the same existing materials.
+            box(
+              mats.trim,
+              wx + side * 0.38,
+              y + 1.12,
+              wz,
+              0.55,
+              0.5,
+              0.9,
+              0,
+              "#babdb5",
+            );
+            box(
+              mats.dark,
+              wx + side * 0.665,
+              y + 1.12,
+              wz,
+              0.018,
+              0.32,
+              0.62,
+              0,
+              "#4c5650",
+            );
+          }
         }
       }
     }
@@ -1202,14 +1337,14 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
       for (const dz of [-17, 17]) {
         const px = x + dx,
           pz = z + dz;
-        box(mats.wood, px, 1, pz, 9, 2, 3.8);
-        box(mats.soil, px, 2.03, pz, 8.7, 0.04, 3.5);
+        box(mats.wood, px, 0.48, pz, 9, 0.96, 3.8);
+        box(mats.soil, px, 0.99, pz, 8.7, 0.04, 3.5);
         for (const sx of [-1, 1])
-          box(mats.wood, px + sx * 4.2, 2, pz, 0.08, 4, 0.08);
+          box(mats.wood, px + sx * 4.2, 1.4, pz, 0.08, 2.8, 0.08);
         box(
           mats.red,
           px,
-          4.05,
+          2.85,
           pz,
           10,
           0.15,
@@ -1217,19 +1352,19 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
           0,
           choose(["#9c5740", "#71805a", "#c2aa7f"]),
         );
-        for (let p = -3.8; p < 4; p += 0.5)
+        for (let p = -3.8; p < 4; p += 0.28)
           for (const dz2 of [-0.8, 0.3])
             instance(
               sphereGeo,
               mats.tomato,
               px + p,
-              2.2,
+              1.075,
               pz + dz2,
-              0.16,
-              0.14,
-              0.16,
+              0.06,
+              0.052,
+              0.06,
             );
-        collision(px, pz, 9, 3.8, 2.1);
+        collision(px, pz, 9, 3.8, 1.2);
       }
     sign(
       "MERCADO DA RIBEIRA",
@@ -1436,6 +1571,38 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
           0.24,
           0.28,
         );
+        const previousDetail = detailLevel;
+        detailLevel = 1;
+        for (const horizontal of [false, true]) {
+          const gx = horizontal
+              ? middle
+              : coordinate + side * (width / 2 - 0.43),
+            gz = horizontal ? coordinate + side * (width / 2 - 0.43) : middle;
+          box(
+            mats.dark,
+            gx,
+            0.051,
+            gz,
+            horizontal ? 0.72 : 0.36,
+            0.015,
+            horizontal ? 0.36 : 0.72,
+            0,
+            "#454c45",
+          );
+          for (let slit = -0.25; slit <= 0.25; slit += 0.1)
+            box(
+              mats.trim,
+              horizontal ? gx + slit : gx,
+              0.063,
+              horizontal ? gz : gz + slit,
+              horizontal ? 0.035 : 0.31,
+              0.012,
+              horizontal ? 0.31 : 0.035,
+              0,
+              "#9a9d90",
+            );
+        }
+        detailLevel = previousDetail;
         if ((block + Math.round(coordinate / 96)) % 2 === 0) {
           lamp(
             coordinate + side * (width / 2 + 2.8),
@@ -1602,11 +1769,13 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
       depth = 24,
       height = 4.8;
     stats.buildings++;
-    box(mats.stone, x, 0.035, z, width, 0.07, depth);
-    for (let px = 15; px < 42; px += 2)
-      for (let pz = 55; pz < 78; pz += 2)
-        if (Math.round(px + pz) % 4 === 2)
-          box(mats.white, px, 0.077, pz, 1.96, 0.012, 1.96);
+    box(mats.floor, x, 0.035, z, width, 0.07, depth);
+    // Sixty-centimetre ceramic slabs, not the old two-metre chequerboard.
+    // Fine grout is physical geometry and does not alias as a noisy texture.
+    for (let px = 13.8; px < 42.3; px += 0.6)
+      box(mats.grout, px, 0.074, z, 0.009, 0.006, depth - 0.3);
+    for (let pz = 54.6; pz < 77.8; pz += 0.6)
+      box(mats.grout, x, 0.074, pz, width - 0.3, 0.006, 0.009);
     // Back and sides have real collisions; the five-metre front door is open.
     for (const [wx, wz, ww, dd] of [
       [13.5, 66, 0.3, 24],
@@ -1615,6 +1784,18 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
     ]) {
       box(mats.plaster, wx, height / 2, wz, ww, height, dd);
       collision(wx, wz, ww, dd, height);
+      box(mats.trim, wx, 0.13, wz, ww + 0.04, 0.18, dd + 0.04, 0, "#8a8e84");
+      box(
+        mats.white,
+        wx,
+        height - 0.16,
+        wz,
+        ww + 0.07,
+        0.12,
+        dd + 0.07,
+        0,
+        "#f1ede1",
+      );
     }
     for (const side of [-1, 1]) {
       const wx = x + side * 9;
@@ -1644,27 +1825,71 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
     });
     // A cash register, scale, produce display and handwritten price signs.
     box(mats.wood, 28, 0.56, 60.5, 12, 1.12, 1.5);
-    box(mats.stone, 28, 1.16, 60.5, 12.25, 0.12, 1.65);
+    box(mats.dark, 28, 0.13, 61.22, 11.8, 0.15, 0.06, 0, "#39453a");
+    for (let panelX = 22.1; panelX < 34; panelX += 0.3)
+      box(mats.wood, panelX, 0.67, 61.27, 0.022, 0.85, 0.045, 0, "#6f573f");
+    bevelBox(mats.floor, 28, 1.16, 60.5, 12.25, 0.12, 1.65, 0.025);
     collision(28, 60.5, 12.25, 1.65, 1.28);
-    box(mats.dark, 31.8, 1.39, 60.5, 0.65, 0.35, 0.52);
+    bevelBox(mats.dark, 31.8, 1.39, 60.5, 0.65, 0.35, 0.52, 0.025);
     box(mats.black, 31.8, 1.7, 60.28, 0.64, 0.4, 0.08, -0.08);
-    box(mats.steel, 24.3, 1.32, 60.5, 0.85, 0.2, 0.65);
+    bevelBox(mats.steel, 24.3, 1.32, 60.5, 0.85, 0.2, 0.65, 0.018);
+    box(mats.dark, 24.3, 1.32, 60.84, 0.3, 0.09, 0.018, 0, "#274338");
+    bevelBox(mats.floor, 24.3, 1.44, 60.5, 0.76, 0.035, 0.55, 0.01);
+    // Till keypad, screen stand, payment terminal and a small paper receipt.
+    box(mats.trim, 31.8, 1.57, 60.42, 0.08, 0.34, 0.08);
+    box(mats.dark, 31.1, 1.31, 60.85, 0.24, 0.13, 0.36, -0.06);
+    box(mats.window, 31.1, 1.39, 60.85, 0.16, 0.012, 0.19, -0.06);
+    box(mats.white, 32.5, 1.23, 60.8, 0.26, 0.012, 0.42, 0.13);
+    // A waist-high back workbench gives the cashier's wall a believable scale.
+    box(mats.wood, 28, 0.48, 55.1, 15, 0.95, 1.4);
+    box(mats.floor, 28, 0.99, 55.1, 15.1, 0.06, 1.5);
+    collision(28, 55.1, 15.1, 1.5, 1.05);
+    for (const bx of [21.7, 24.3, 31.7, 34.3]) {
+      box(mats.trim, bx, 0.49, 55.84, 2.35, 0.78, 0.035, 0, "#b5b4a6");
+      box(mats.dark, bx + 0.65, 0.63, 55.87, 0.32, 0.035, 0.045);
+    }
     for (const sx of [17, 39]) {
       box(mats.wood, sx, 0.46, 67, 3.3, 0.92, 9);
       collision(sx, 67, 3.3, 9, 1.2);
       for (let pz = 63.4; pz <= 70.7; pz += 1.8) {
         box(mats.dark, sx, 0.99, pz, 2.85, 0.12, 1.48);
-        for (const dx of [-0.8, 0, 0.8])
-          for (const dz of [-0.34, 0.34])
+        // Shallow slatted produce trays hold tomatoes at their real scale.
+        for (const edge of [-1, 1]) {
+          box(
+            mats.wood,
+            sx,
+            1.075,
+            pz + edge * 0.69,
+            2.77,
+            0.16,
+            0.045,
+            0,
+            "#8a6d4d",
+          );
+          box(
+            mats.wood,
+            sx + edge * 1.38,
+            1.075,
+            pz,
+            0.045,
+            0.16,
+            1.4,
+            0,
+            "#8a6d4d",
+          );
+        }
+        for (let dx = -1.15; dx <= 1.2; dx += 0.22)
+          for (const dz of [-0.47, -0.23, 0, 0.23, 0.47])
             instance(
               sphereGeo,
               mats.tomato,
               sx + dx,
-              1.2,
+              1.105 +
+                ((Math.round((dx + 2) * 10) + Math.round(dz * 10)) % 3) * 0.006,
               pz + dz,
-              0.24,
-              0.21,
-              0.23,
+              0.06,
+              0.052,
+              0.058,
               0,
               dx < 0 ? "#9d3327" : "#bc4828",
             );
@@ -1712,7 +1937,8 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
       "ENTRA · PRODUTOS DA NOSSA ESTUFA",
     );
     for (const sx of [20, 36]) {
-      box(mats.warmLight, sx, 4.3, 66, 0.3, 0.08, 8);
+      box(mats.trim, sx, 4.34, 66, 0.42, 0.12, 8.2);
+      box(mats.warmLight, sx, 4.26, 66, 0.3, 0.025, 8);
       const light = new THREE.PointLight(0xffe4ba, 50, 19, 2);
       light.position.set(sx, 3.8, 66);
       group.add(light);
@@ -1807,6 +2033,7 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
     0,
     "CULTIVAR O AMANHÃ, DESDE HOJE",
   );
+  for (const x of [20, 36]) box(mats.steel, x, 5.95, 78.05, 0.09, 2.0, 0.14);
   farmingBlock(48, 144, 73, 73, false);
   companyPhase = 1;
   greenhouse(24, 144, 29, 63, true);

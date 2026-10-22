@@ -1,6 +1,8 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
+import { createPhotoTextures, PHOTO_ASSETS } from "./photo-assets.js";
+import { createScannedHead } from "./scanned-head.js";
 
 const palette = {
   skin: 0xc68f70,
@@ -104,6 +106,16 @@ function textile(color, normal, repeat = 3) {
   material.map.repeat.set(repeat, repeat);
   material.roughnessMap.repeat.set(repeat, repeat);
   normal.repeat.set(repeat, repeat);
+  if (typeof Image !== "undefined" && PHOTO_ASSETS.cloth) {
+    Object.assign(material, createPhotoTextures("cloth", repeat, repeat));
+    material.normalScale.set(0.18, 0.18);
+    // The scanned neutral fabric supplies real fibre detail. Compensate for its
+    // mid-grey base so tinting keeps the existing garment colours readable.
+    material.color.multiplyScalar(2.4);
+    material.color.r = Math.min(1, material.color.r);
+    material.color.g = Math.min(1, material.color.g);
+    material.color.b = Math.min(1, material.color.b);
+  }
   return material;
 }
 function mergeDirectMeshes(parent) {
@@ -125,7 +137,10 @@ function mergeDirectMeshes(parent) {
     const combined = mergeGeometries(geometries, false);
     geometries.forEach((geometry) => geometry.dispose());
     const object = new THREE.Mesh(combined, material);
-    object.castShadow = object.receiveShadow = true;
+    // Alpha glass should admit daylight into the cabin rather than producing
+    // the solid black windshield shadow of an opaque depth pass.
+    object.castShadow = !material.transparent;
+    object.receiveShadow = true;
     parent.add(object);
   }
 }
@@ -312,10 +327,17 @@ export function createCharacter({
       cloth,
     );
   const skins = [0xc18c6b, 0xb17c5c, 0x825842, 0xd1a180, 0xa87d61];
-  const skin = standard(
-    enemy ? 0xa57455 : skins[Math.abs(index) % skins.length],
-    0.78,
-  );
+  const skinColor = enemy ? 0xa57455 : skins[Math.abs(index) % skins.length];
+  const skin = new THREE.MeshPhysicalMaterial({
+    color: skinColor,
+    roughness: 0.64,
+    metalness: 0,
+    ior: 1.4,
+    specularIntensity: 0.38,
+    sheen: 0.12,
+    sheenColor: new THREE.Color(skinColor).multiplyScalar(0.5),
+    sheenRoughness: 0.85,
+  });
   Object.assign(skin, surfaceFinish("skin", 109 + index));
   skin.normalMap = leatherGrain;
   skin.normalScale = new THREE.Vector2(0.035, 0.035);
@@ -324,9 +346,7 @@ export function createCharacter({
     seam = standard(0xaaa18b, 0.92),
     metal = standard(0x8e9390, 0.39, 0.65),
     dark = standard(0x252c28, 0.84),
-    hair = standard(index % 3 === 0 ? 0x3e3025 : 0x5a4737, 0.96),
-    eye = standard(0x302c25, 0.35),
-    white = standard(0xc4bdb1, 0.68);
+    hair = standard(index % 3 === 0 ? 0x3e3025 : 0x5a4737, 0.96);
   leather.normalMap = leatherGrain;
   leather.normalScale = new THREE.Vector2(0.12, 0.12);
   const profile = [
@@ -388,51 +408,18 @@ export function createCharacter({
     for (const side of [-1, 1])
       box(rig, reflective, side * 0.154, 1.3, 0.142, 0.025, 0.19, 0.008);
   }
-  cylinder(rig, skin, 0, 1.49, 0, 0.071, 0.08, 0.145, 14);
   const head = new THREE.Group();
   head.scale.set(0.79, 0.76, 0.79);
-  head.position.y = 1.665 * (1 - 0.76) + 0.028;
+  head.position.y = 1.665 * (1 - 0.76) + 0.003;
   rig.add(head);
-  sphere(head, skin, 0, 1.665, 0.012, 0.157, 0.83, 1.075, 0.91, 20);
-  // Brow, cheeks, ears and a small nose remain readable in close third-person views.
-  sphere(head, skin, -0.132, 1.66, 0.008, 0.032, 0.55, 1, 0.75, 12);
-  sphere(head, skin, 0.132, 1.66, 0.008, 0.032, 0.55, 1, 0.75, 12);
-  sphere(head, skin, 0, 1.645, 0.151, 0.029, 0.64, 0.84, 1.08, 12);
-  for (const side of [-1, 1]) {
-    sphere(head, white, side * 0.054, 1.696, 0.137, 0.024, 1, 0.47, 0.24, 12);
-    sphere(head, eye, side * 0.054, 1.696, 0.144, 0.011, 0.82, 1, 0.35, 10);
-    const brow = box(
-      head,
-      hair,
-      side * 0.054,
-      1.721,
-      0.135,
-      0.043,
-      0.009,
-      0.008,
-    );
-    brow.rotation.z = -side * 0.08;
-  }
-  rounded(
-    head,
-    standard(0x86594c, 0.8),
-    0,
-    1.589,
-    0.136,
-    0.048,
-    0.006,
-    0.008,
-    0.002,
-  );
-  sphere(head, hair, 0, 1.786, -0.015, 0.146, 1, 0.29, 0.98, 18);
+  rig.add(createScannedHead({ index: enemy ? index + 2 : index }));
   if (!civilian || index % 3 === 0) {
+    sphere(head, hair, 0, 1.742, -0.014, 0.147, 0.92, 0.7, 0.96, 24);
     const cap = textile(enemy ? 0x4b483b : 0x526557, cloth);
     sphere(head, cap, 0, 1.801, -0.015, 0.15, 1, 0.34, 1, 18);
     rounded(head, cap, 0, 1.79, 0.13, 0.24, 0.018, 0.2, 0.018).rotation.x =
       0.08;
     box(head, seam, 0, 1.811, 0.124, 0.044, 0.015, 0.012);
-  } else if (index % 2 === 1) {
-    sphere(head, hair, 0, 1.71, -0.075, 0.13, 1.04, 0.92, 0.56, 16);
   }
   mergeDirectMeshes(head);
   if (!civilian) {
@@ -460,7 +447,8 @@ export function createCharacter({
   }
   const legs = [],
     shins = [],
-    arms = [];
+    arms = [],
+    elbows = [];
   for (const side of [-1, 1]) {
     const leg = new THREE.Group();
     leg.position.set(side * 0.112, 0.846, 0);
@@ -481,12 +469,42 @@ export function createCharacter({
     arm.rotation.z = -side * 0.07;
     rig.add(arm);
     capsule(arm, jacket, 0, -0.125, 0, 0.076, 0.17);
-    capsule(arm, jacket, 0, -0.345, 0.01, 0.06, 0.17);
-    cylinder(arm, panel, 0, -0.451, 0.01, 0.061, 0.057, 0.036, 12);
-    sphere(arm, skin, 0, -0.504, 0.017, 0.058, 0.77, 1.18, 0.73, 14);
-    sphere(arm, skin, -side * 0.038, -0.496, 0.048, 0.026, 0.7, 1, 0.75, 10);
+    const elbow = new THREE.Group();
+    elbow.position.set(0, -0.265, 0);
+    elbow.rotation.x = -0.16;
+    arm.add(elbow);
+    capsule(elbow, jacket, 0, -0.08, 0.01, 0.06, 0.17);
+    // Slight gathering above the cuff gives fabric a fold without extra passes.
+    sphere(elbow, jacket, 0, -0.156, 0.009, 0.062, 1, 0.18, 0.96, 12);
+    cylinder(elbow, panel, 0, -0.186, 0.01, 0.061, 0.057, 0.036, 12);
+    sphere(elbow, skin, 0, -0.23, 0.017, 0.043, 0.86, 1.02, 0.64, 16);
+    for (let finger = 0; finger < 4; finger++) {
+      const length = [0.034, 0.046, 0.043, 0.032][finger];
+      const digit = capsule(
+        elbow,
+        skin,
+        (finger - 1.5) * 0.017,
+        -0.261 - length * 0.5,
+        0.021,
+        0.0082,
+        length,
+      );
+      digit.rotation.x = -0.1 - Math.abs(finger - 1.5) * 0.04;
+    }
+    const thumb = capsule(
+      elbow,
+      skin,
+      -side * 0.039,
+      -0.236,
+      0.045,
+      0.012,
+      0.03,
+    );
+    thumb.rotation.set(-0.4, 0, side * 0.45);
+    mergeDirectMeshes(elbow);
     mergeDirectMeshes(arm);
     arms.push(arm);
+    elbows.push(elbow);
   }
   mergeDirectMeshes(rig);
   group.name = civilian
@@ -536,8 +554,22 @@ export function createCharacter({
         aiming ? -0.22 : -0.07,
         blend,
       );
+      elbows[0].rotation.x = THREE.MathUtils.lerp(
+        elbows[0].rotation.x,
+        -0.16 - motion * (0.13 + Math.max(0, -Math.sin(phase)) * 0.22),
+        blend,
+      );
+      elbows[1].rotation.x = THREE.MathUtils.lerp(
+        elbows[1].rotation.x,
+        aiming
+          ? -0.52
+          : -0.16 - motion * (0.13 + Math.max(0, Math.sin(phase)) * 0.22),
+        blend,
+      );
       rig.position.y = Math.abs(Math.sin(phase)) * 0.018 * motion;
       rig.rotation.z = Math.sin(phase) * 0.012 * motion;
+      rig.rotation.x = motion * 0.025;
+      rig.rotation.z += Math.sin(time * 1.2 + index) * 0.002 * (1 - motion);
     },
   };
 }
@@ -609,18 +641,22 @@ export function createVehicle(color = 0xb14d39) {
   group.name = "tomato-delivery-pickup";
   const paint = new THREE.MeshPhysicalMaterial({
       color,
-      roughness: 0.31,
-      metalness: 0.27,
-      clearcoat: 0.72,
-      clearcoatRoughness: 0.2,
+      roughness: 0.26,
+      metalness: 0.18,
+      clearcoat: 1,
+      clearcoatRoughness: 0.11,
+      ior: 1.5,
+      specularIntensity: 0.7,
     }),
-    paintDark = standard(
-      new THREE.Color(color).multiplyScalar(0.76),
-      0.46,
-      0.3,
-    ),
-    rubber = standard(0x242725, 0.94),
-    metal = standard(0x9ba3a2, 0.29, 0.82),
+    paintDark = new THREE.MeshPhysicalMaterial({
+      color: new THREE.Color(color).multiplyScalar(0.81),
+      roughness: 0.34,
+      metalness: 0.18,
+      clearcoat: 0.85,
+      clearcoatRoughness: 0.15,
+    }),
+    rubber = standard(0x202320, 0.87),
+    metal = standard(0xa6abaa, 0.24, 0.9),
     dark = standard(0x28312e, 0.78, 0.12),
     seat = textile(0x414b44, surfaceTexture("cloth", 47)),
     wood = standard(0x92734f, 0.96);
@@ -631,11 +667,14 @@ export function createVehicle(color = 0xb14d39) {
   wood.normalMap = surfaceTexture("wood", 81);
   wood.normalScale = new THREE.Vector2(0.13, 0.13);
   const glass = new THREE.MeshPhysicalMaterial({
-    color: 0x718787,
-    roughness: 0.075,
-    metalness: 0.1,
+    color: 0xa8b9b7,
+    roughness: 0.035,
+    metalness: 0,
+    ior: 1.52,
+    specularIntensity: 1,
+    envMapIntensity: 1.2,
     transparent: true,
-    opacity: 0.47,
+    opacity: 0.5,
     // Reflection plus alpha is sufficient at this scale and avoids a separate
     // scene transmission render for every visible fleet/traffic vehicle.
     transmission: 0,
@@ -646,13 +685,13 @@ export function createVehicle(color = 0xb14d39) {
   const light = new THREE.MeshStandardMaterial({
       color: 0xe4dbbd,
       emissive: 0xf7dc9e,
-      emissiveIntensity: 0.7,
+      emissiveIntensity: 0.08,
       roughness: 0.18,
     }),
     redLight = new THREE.MeshStandardMaterial({
       color: 0x9b3027,
       emissive: 0xc73b26,
-      emissiveIntensity: 0.35,
+      emissiveIntensity: 0.055,
       roughness: 0.25,
     }),
     amber = standard(0xb88237, 0.4);
@@ -680,6 +719,18 @@ export function createVehicle(color = 0xb14d39) {
       0.035,
     );
     rounded(body, amber, side * 0.846, 0.94, 2.075, 0.054, 0.12, 0.079, 0.01);
+    for (const inset of [-0.08, 0.01, 0.1])
+      rounded(
+        body,
+        metal,
+        side * 0.665 + inset,
+        0.94,
+        2.116,
+        0.005,
+        0.135,
+        0.006,
+        0.001,
+      );
     rounded(
       body,
       redLight,
@@ -778,6 +829,49 @@ export function createVehicle(color = 0xb14d39) {
     ]);
     rounded(body, paint, side * 0.894, 1.015, 0.36, 0.055, 0.43, 1.17, 0.015);
     box(body, dark, side * 0.926, 1.115, -0.166, 0.01, 0.72, 0.013);
+    box(body, dark, side * 0.926, 0.807, 0.39, 0.012, 0.009, 1.1);
+    box(body, dark, side * 0.926, 1.003, 0.96, 0.012, 0.39, 0.01);
+    beam(
+      body,
+      dark,
+      [side * 0.881, 1.247, -0.165],
+      [side * 0.881, 1.247, 0.99],
+      0.013,
+    );
+    beam(
+      body,
+      dark,
+      [side * 0.881, 1.78, -0.165],
+      [side * 0.881, 1.78, 0.72],
+      0.011,
+    );
+    beam(
+      body,
+      dark,
+      [side * 0.881, 1.247, 0.99],
+      [side * 0.881, 1.78, 0.72],
+      0.011,
+    );
+    beam(
+      body,
+      dark,
+      [side * 0.881, 1.247, -0.165],
+      [side * 0.881, 1.78, -0.165],
+      0.013,
+    );
+    // A roof drip rail and the rear door seal create fine, physically shaded
+    // edges while sharing the existing painted/black material batches.
+    rounded(
+      body,
+      paintDark,
+      side * 0.861,
+      1.814,
+      0.28,
+      0.035,
+      0.018,
+      1.04,
+      0.006,
+    );
     rounded(
       body,
       metal,
@@ -815,6 +909,16 @@ export function createVehicle(color = 0xb14d39) {
     [0.8, 1.775, 0.741],
     [-0.8, 1.775, 0.741],
   ]);
+  beam(body, dark, [-0.804, 1.25, 1.087], [0.804, 1.25, 1.087], 0.016);
+  beam(body, dark, [-0.804, 1.781, 0.738], [0.804, 1.781, 0.738], 0.013);
+  for (const side of [-1, 1])
+    beam(
+      body,
+      dark,
+      [side * 0.804, 1.25, 1.087],
+      [side * 0.804, 1.781, 0.738],
+      0.012,
+    );
   glassPanel(body, glass, [
     [-0.792, 1.276, -0.212],
     [0.792, 1.276, -0.212],
@@ -891,6 +995,13 @@ export function createVehicle(color = 0xb14d39) {
       tire.rotation.y = Math.PI / 2;
       cylinder(wheel, rubber, 0, 0, 0, 0.299, 0.299, 0.21, 24).rotation.z =
         Math.PI / 2;
+      const sidewall = mesh(
+        new THREE.TorusGeometry(0.326, 0.007, 5, 28),
+        rubber,
+        wheel,
+        side * 0.096,
+      );
+      sidewall.rotation.y = Math.PI / 2;
       cylinder(
         wheel,
         metal,
@@ -1028,7 +1139,7 @@ export function createVehicle(color = 0xb14d39) {
         dt,
       );
       redLight.emissiveIntensity =
-        Math.abs(speed) < Math.abs(oldSpeed) - dt ? 1.6 : 0.35;
+        Math.abs(speed) < Math.abs(oldSpeed) - dt ? 1.4 : 0.055;
       oldSpeed = speed;
     },
   };

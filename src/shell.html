@@ -28,7 +28,7 @@
           >
           <div class="edition">
             <span class="status-dot"></span> UM NOVO TERRITÓRIO
-            <span class="edition-number">VOL. 04</span>
+            <span class="edition-number">VOL. 05</span>
           </div>
         </header>
         <div class="menu-content">
@@ -129,8 +129,8 @@
               ><span>QUALIDADE</span
               ><select id="quality">
                 <option value="low">Desempenho</option>
-                <option value="medium" selected>Equilibrada</option>
-                <option value="high">Alta</option>
+                <option value="medium">Equilibrada</option>
+                <option value="high" selected>Realismo</option>
               </select></label
             >
             <label for="sensitivity" class="sensitivity-setting"
@@ -153,6 +153,9 @@
             >
               <span aria-hidden="true">♪</span> Som ligado
             </button>
+            <button id="open-asset-credits" class="sound-button" type="button">
+              Créditos
+            </button>
           </div>
         </div>
         <aside class="world-caption" aria-hidden="true">
@@ -164,7 +167,7 @@
         <footer class="menu-footer">
           <span>PROTÓTIPO JOGÁVEL · 1 JOGADOR</span
           ><span>SEM PRESSA. SEM LIMITES PARA A IMAGINAÇÃO.</span
-          ><span class="footer-build">TOMATO REPUBLIC <i>04</i></span>
+          ><span class="footer-build">TOMATO REPUBLIC <i>05</i></span>
         </footer>
       </section>
 
@@ -609,6 +612,46 @@
           Ativa o JavaScript no navegador para entrares em Tomato Republic.
         </div></noscript
       >
+      <dialog id="asset-credits" aria-labelledby="asset-credits-title">
+        <form method="dialog">
+          <h2 id="asset-credits-title">Créditos dos recursos</h2>
+          <p>
+            Materiais fotográficos:
+            <a href="https://ambientcg.com/" target="_blank" rel="noopener"
+              >ambientCG</a
+            >, licença CC0.
+          </p>
+          <p>
+            Ambiente HDR «Rooitou Park»:
+            <a
+              href="https://polyhaven.com/a/rooitou_park"
+              target="_blank"
+              rel="noopener"
+              >Poly Haven / HDRI Haven</a
+            >, licença CC0.
+          </p>
+          <p>
+            Modelo da cabeça «Infinite, 3D Head Scan»:
+            <a
+              href="https://www.triplegangers.com/"
+              target="_blank"
+              rel="noopener"
+              >Lee Perry-Smith / Infinite Realities</a
+            >, licença
+            <a
+              href="https://creativecommons.org/licenses/by/3.0/"
+              target="_blank"
+              rel="noopener"
+              >CC BY 3.0</a
+            >. Escala, orientação e geometria adaptadas para as personagens.
+          </p>
+          <p>
+            Motor gráfico: Three.js, licença MIT. As atribuições completas
+            também estão incluídas neste ficheiro.
+          </p>
+          <button class="primary-button" autofocus>Voltar ao jogo</button>
+        </form>
+      </dialog>
     </main>
   </body>
 </html>
