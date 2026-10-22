@@ -1678,6 +1678,45 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
   const reserved = [];
   const reserve = (x, z) => reserved.push({ x, z });
   const isReserved = (x, z) => reserved.some((p) => p.x === x && p.z === z);
+  // Keep whole city blocks free for the visitable dealership and homes. Their
+  // interactive geometry is owned by estates-world so it can be rebuilt alone.
+  const estatesSites = city
+    ? [
+        {
+          id: "car-dealer",
+          type: "dealership",
+          x: 144,
+          z: 134,
+          parcelX: 144,
+          parcelZ: 144,
+        },
+        {
+          id: "apartamento",
+          type: "property",
+          x: -144,
+          z: -146,
+          parcelX: -144,
+          parcelZ: -144,
+        },
+        {
+          id: "casa-jardim",
+          type: "property",
+          x: -528,
+          z: -148,
+          parcelX: -528,
+          parcelZ: -144,
+        },
+        {
+          id: "villa-mar",
+          type: "property",
+          x: 144,
+          z: 613,
+          parcelX: 144,
+          parcelZ: 624,
+        },
+      ]
+    : [];
+  for (const site of estatesSites) reserve(site.parcelX, site.parcelZ);
   // Locations are deliberately placed at streets/forecourts and are reachable
   // with the larger vehicle collision radius, rather than inside a solid mesh.
   const locations = city
@@ -3045,6 +3084,7 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
     businessLocations,
     interactionPoints,
     interiorZones,
+    estatesSites,
     fleetSpawns: [
       { x: 18, z: 106, yaw: Math.PI },
       { x: 28, z: 106, yaw: Math.PI },

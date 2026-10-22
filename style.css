@@ -568,6 +568,7 @@ h1 em {
 }
 .settings {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 24px;
   max-width: 675px;
@@ -3870,5 +3871,931 @@ body:not([data-state="playing"]) #venue-work {
   }
   .venue-body {
     padding-top: 14px;
+  }
+}
+
+/* Personal vehicles, visitable homes and driving routes. */
+body[data-state="ownership"] #menu,
+body[data-state="ownership"] #touch-controls,
+body[data-state="ownership"] #crosshair,
+body[data-state="ownership"] #prompt,
+body[data-state="ownership"] #story-toast {
+  display: none;
+}
+body[data-state="ownership"] #hud {
+  pointer-events: none;
+  opacity: 0.34;
+}
+.ownership-overlay[hidden] {
+  display: none;
+}
+.ownership-overlay {
+  position: absolute;
+  z-index: 35;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 25px;
+  color: #2d4433;
+  background: #0c201ab8;
+  backdrop-filter: blur(3px);
+}
+.ownership-window {
+  display: flex;
+  flex-direction: column;
+  width: min(1150px, 100%);
+  height: min(790px, calc(100dvh - 50px));
+  overflow: hidden;
+  border: 1px solid #c6d0b775;
+  border-radius: 7px;
+  background: #eeeee3;
+  box-shadow: 0 25px 100px #04130c85;
+}
+.ownership-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 25px 30px 23px;
+  color: #f0efdf;
+  background: linear-gradient(115deg, #2c4938, #1d362a);
+}
+.ownership-header .company-tag {
+  border: 0;
+  padding: 0;
+  margin: 0 0 10px;
+  background: transparent;
+  color: #bccea5;
+  font-size: 8px;
+  letter-spacing: 1.8px;
+}
+.ownership-header h2 {
+  margin: 0 0 9px;
+  font-family: Georgia, serif;
+  font-size: clamp(27px, 3vw, 37px);
+  line-height: 1.08;
+  font-weight: 400;
+  letter-spacing: -0.6px;
+}
+.ownership-header p {
+  margin: 0;
+  color: #abbda4;
+  font-size: 11px;
+  line-height: 1.6;
+}
+#ownership-close {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border: 1px solid #b8c7a755;
+  border-radius: 50%;
+  color: #e1e6d2;
+  background: #ffffff08;
+  font-size: 26px;
+  line-height: 1;
+}
+#ownership-close:hover {
+  background: #ffffff15;
+}
+.ownership-layout {
+  display: grid;
+  grid-template-columns: 214px minmax(0, 1fr);
+  flex: 1;
+  min-height: 0;
+}
+.ownership-nav {
+  padding: 20px 14px;
+  overflow: auto;
+  background: #e1e6d6;
+  border-right: 1px solid #c7d0b9;
+}
+.ownership-nav > button {
+  display: flex;
+  width: 100%;
+  gap: 12px;
+  align-items: center;
+  margin: 0 0 6px;
+  padding: 15px 11px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  color: #6c7a61;
+  text-align: left;
+  font-size: 11px;
+  line-height: 1.35;
+}
+.ownership-nav > button small {
+  font-size: 8px;
+  color: #99a28d;
+  font-variant-numeric: tabular-nums;
+}
+.ownership-nav > button:hover {
+  background: #f4f5e9;
+}
+.ownership-nav > button.active {
+  background: #f7f6ec;
+  border-color: #bcc8aa;
+  color: #314b32;
+  box-shadow: inset 3px 0 #b58c58;
+}
+.ownership-nav > button.active small {
+  color: #b08b56;
+}
+.ownership-cash {
+  margin: 26px 6px 0;
+  padding: 19px 0 0;
+  border-top: 1px solid #bcc8ac;
+}
+.ownership-cash > span {
+  font-size: 8px;
+  letter-spacing: 1.2px;
+  color: #859378;
+}
+.ownership-cash > strong {
+  display: block;
+  margin: 9px 0 13px;
+  color: #3d5d37;
+  font-size: 26px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+.ownership-cash > p {
+  margin: 0;
+  font-size: 10px;
+  line-height: 1.75;
+  color: #85917a;
+}
+.ownership-content {
+  min-width: 0;
+  overflow: auto;
+  padding: 24px 26px 35px;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #a9b695 transparent;
+}
+#ownership-feedback {
+  margin: 0 0 19px;
+  padding: 12px 15px;
+  border-left: 3px solid #c19a62;
+  color: #537043;
+  background: #e0e8d2;
+  font-size: 12px;
+  line-height: 1.6;
+}
+#ownership-feedback:empty {
+  display: none;
+}
+.ownership-intro {
+  margin: 0 0 23px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid #d5dcc9;
+}
+.ownership-intro > .company-tag,
+.ownership-card > .company-tag {
+  margin-bottom: 10px;
+}
+.ownership-intro h3 {
+  font-family: Georgia, serif;
+  font-size: 28px;
+  line-height: 1.15;
+  font-weight: 400;
+  color: #3a553b;
+  letter-spacing: -0.35px;
+  margin: 0 0 10px;
+}
+.ownership-intro p,
+.ownership-card p,
+.ownership-empty p,
+.ownership-note p {
+  font-size: 12px;
+  line-height: 1.8;
+  color: #7b866e;
+  margin: 0 0 15px;
+}
+.ownership-intro p:last-child,
+.ownership-card p:last-child,
+.ownership-empty p:last-child,
+.ownership-note p:last-child {
+  margin-bottom: 0;
+}
+.ownership-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0 0 24px;
+}
+.ownership-metric {
+  padding: 15px 13px;
+  border: 1px solid #d4ddc8;
+  background: #f7f7ee;
+  border-radius: 3px;
+  min-width: 0;
+}
+.ownership-metric > span {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 7px;
+  letter-spacing: 1px;
+  color: #8c977d;
+}
+.ownership-metric > strong {
+  display: block;
+  font-size: 22px;
+  font-weight: 400;
+  color: #45633c;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.ownership-metric > small {
+  display: block;
+  margin-top: 8px;
+  color: #9aa38c;
+  font-size: 9px;
+  line-height: 1.5;
+}
+.ownership-feature-grid,
+.ownership-catalog,
+.ownership-homes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.ownership-card {
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid #cdd7c0;
+  border-radius: 4px;
+  background: #fafbf2;
+}
+.ownership-card h3,
+.ownership-empty h3 {
+  margin: 0 0 10px;
+  font-family: Georgia, serif;
+  font-size: 23px;
+  font-weight: 400;
+  line-height: 1.2;
+  color: #3b593c;
+  letter-spacing: -0.3px;
+}
+.ownership-card .company-tag {
+  font-size: 7px;
+  letter-spacing: 1px;
+  color: #788b62;
+  background: #edf1e3;
+  border-color: #d9e0cb;
+}
+.ownership-car-art {
+  display: block;
+  width: 100%;
+  max-height: 145px;
+  margin: 10px 0 18px;
+}
+.ownership-card-top {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.ownership-price {
+  font-variant-numeric: tabular-nums;
+  font-size: 19px;
+  line-height: 1.3;
+  font-weight: 400;
+  color: #a88451;
+}
+.ownership-specs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 16px 0 19px;
+  padding: 14px 0;
+  gap: 13px 10px;
+  border-top: 1px solid #dee4d2;
+  border-bottom: 1px solid #dee4d2;
+}
+.ownership-specs dt {
+  color: #96a087;
+  font-size: 9px;
+  margin: 0 0 5px;
+}
+.ownership-specs dd {
+  margin: 0;
+  color: #4b6641;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+.ownership-specs dd small {
+  font-size: 9px;
+  color: #91a07f;
+}
+.ownership-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px;
+}
+.ownership-card .company-action,
+.ownership-intro .company-action,
+.ownership-empty .company-action {
+  min-height: 40px;
+  padding: 11px 14px;
+  font-size: 10px;
+  line-height: 1.4;
+}
+.ownership-card .company-action {
+  flex: 1 1 auto;
+}
+.ownership-card > .company-action {
+  width: 100%;
+}
+.ownership-card .company-action:disabled,
+.ownership-intro .company-action:disabled {
+  cursor: default;
+  opacity: 0.48;
+}
+.ownership-card .ownership-owned-line {
+  border-left: 2px solid #b5c49e;
+  padding-left: 10px;
+  color: #82936e;
+  font-size: 10px;
+  line-height: 1.6;
+}
+.ownership-reason {
+  display: block;
+  flex-basis: 100%;
+  font-size: 10px;
+  line-height: 1.7;
+  margin: 9px 0 0;
+  color: #9b947c;
+}
+.ownership-empty {
+  padding: 30px;
+  border: 1px dashed #c4d1b4;
+  border-radius: 4px;
+  background: #f7f8ed;
+}
+.ownership-note {
+  padding: 17px 20px;
+  border-left: 3px solid #b8945f;
+  background: #e5ead9;
+  margin-top: 22px;
+}
+.ownership-note > strong {
+  display: block;
+  margin: 0 0 7px;
+  color: #637b50;
+  font-size: 12px;
+}
+.ownership-note p {
+  font-size: 10px;
+}
+.ownership-vehicle-bars {
+  display: grid;
+  gap: 15px;
+}
+.ownership-vehicle-bars label > span {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: #93a080;
+  font-size: 9px;
+  margin-bottom: 7px;
+}
+.ownership-vehicle-bars b {
+  font-weight: 400;
+  color: #607d4c;
+  font-variant-numeric: tabular-nums;
+}
+.ownership-window progress {
+  display: block;
+  height: 4px;
+  width: 100%;
+  border: 0;
+  overflow: hidden;
+  border-radius: 2px;
+  background: #dfe6d2;
+  color: #a9bd7d;
+  accent-color: #8aa45f;
+}
+.ownership-window progress::-webkit-progress-bar {
+  background: #dfe6d2;
+}
+.ownership-window progress::-webkit-progress-value {
+  background: #8fa968;
+}
+.ownership-window progress::-moz-progress-bar {
+  background: #8fa968;
+}
+.ownership-card .ownership-mileage {
+  margin: 16px 0;
+  font-size: 10px;
+  color: #99a38b;
+}
+.ownership-house-art {
+  position: relative;
+  height: 135px;
+  margin: 10px 0 21px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: linear-gradient(#d2ded9, #edf0e4 82%);
+}
+.ownership-house-art i {
+  display: block;
+  position: absolute;
+}
+.ownership-house-art .house-sun {
+  top: 14px;
+  right: 24px;
+  width: 27px;
+  height: 27px;
+  background: #eee8c7;
+  border-radius: 50%;
+}
+.ownership-house-art .house-ground {
+  bottom: 0;
+  height: 24px;
+  width: 100%;
+  background: #b9c6a3;
+}
+.ownership-house-art .house-building {
+  bottom: 24px;
+  left: 20%;
+  width: 58%;
+  height: 65px;
+  background: #d4c7ad;
+  border: 1px solid #a6ac96;
+  box-shadow: 8px 2px #a6b19f;
+}
+.ownership-house-art .house-building:before {
+  content: "";
+  position: absolute;
+  inset: -19px -9px auto;
+  height: 22px;
+  background: #92644a;
+  clip-path: polygon(10% 0, 89% 0, 100% 100%, 0 100%);
+}
+.ownership-house-art .house-building b {
+  position: absolute;
+  top: 16px;
+  width: 13%;
+  height: 18px;
+  border: 2px solid #a3a58e;
+  background: #788f8b;
+}
+.ownership-house-art .house-building b:nth-child(1) {
+  left: 9%;
+}
+.ownership-house-art .house-building b:nth-child(2) {
+  left: 30%;
+}
+.ownership-house-art .house-building b:nth-child(3) {
+  right: 30%;
+}
+.ownership-house-art .house-building b:nth-child(4) {
+  right: 9%;
+}
+.ownership-house-art .house-building em {
+  position: absolute;
+  bottom: 0;
+  left: 43%;
+  width: 15%;
+  height: 32px;
+  background: #697c68;
+}
+.ownership-house-art .house-tree {
+  right: 10%;
+  bottom: 24px;
+  width: 8px;
+  height: 29px;
+  background: #829175;
+}
+.ownership-house-art .house-tree:before {
+  content: "";
+  position: absolute;
+  width: 38px;
+  height: 36px;
+  top: -28px;
+  left: -16px;
+  border-radius: 50% 50% 42% 50%;
+  background: #819c70;
+}
+.ownership-house-art.is-apartment .house-building {
+  height: 98px;
+  width: 43%;
+  left: 27%;
+  background: #cfcdba;
+}
+.ownership-house-art.is-apartment .house-building:before {
+  inset: -5px -4px auto;
+  height: 8px;
+  clip-path: none;
+  background: #6d8173;
+}
+.ownership-house-art.is-apartment .house-building b {
+  box-shadow: 0 30px #788f8b;
+}
+.ownership-house-art.is-villa .house-building {
+  height: 60px;
+  width: 65%;
+  left: 14%;
+  background: #e3dfcb;
+}
+.ownership-house-art.is-villa .house-building:before {
+  inset: -6px -4px auto;
+  height: 9px;
+  clip-path: none;
+  background: #8a9a89;
+}
+.ownership-house-art.is-villa .house-building b {
+  width: 17%;
+  height: 25px;
+  border-color: #b1b8a4;
+}
+.ownership-house-art .house-water {
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 17px;
+  background: #8baeb1;
+  opacity: 0.7;
+}
+.ownership-home-level {
+  padding: 14px 0;
+  margin: 16px 0;
+  border-top: 1px solid #dce4ce;
+  border-bottom: 1px solid #dce4ce;
+}
+.ownership-home-level > span {
+  color: #99a389;
+  font-size: 8px;
+  letter-spacing: 0.8px;
+}
+.ownership-home-level > strong {
+  display: block;
+  color: #6d8558;
+  font-size: 13px;
+  font-weight: 400;
+  margin: 7px 0 13px;
+}
+.ownership-home-card.is-current {
+  border-color: #a6b58d;
+  box-shadow: 0 0 0 2px #d0dac080;
+}
+.ownership-milestones {
+  display: grid;
+  gap: 14px;
+}
+.ownership-milestone {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 18px;
+}
+.ownership-milestone-check {
+  display: grid;
+  place-items: center;
+  background: #e7eddb;
+  color: #b7c39e;
+  width: 42px;
+  height: 48px;
+  border-bottom: 3px solid #c8d3b1;
+  font-size: 25px;
+}
+.ownership-milestone.is-claimed .ownership-milestone-check {
+  color: #7a9558;
+}
+.ownership-milestone-progress {
+  display: flex;
+  align-items: center;
+  gap: 17px;
+  margin: 16px 0 13px;
+}
+.ownership-milestone-progress > span {
+  min-width: 42px;
+  color: #94a17f;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.ownership-milestone-progress > progress {
+  flex: 1;
+}
+.ownership-reward {
+  display: block;
+  color: #a58b57;
+  font-size: 16px;
+  font-weight: 400;
+  margin: 12px 0;
+}
+.ownership-trial-route {
+  display: block;
+  height: 42px;
+  position: relative;
+  margin: 0 0 15px;
+}
+.ownership-trial-route:before {
+  content: "";
+  position: absolute;
+  left: 9px;
+  right: 9px;
+  top: 21px;
+  height: 3px;
+  background: #c3d0af;
+}
+.ownership-trial-route > i {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border: 2px solid #8aa369;
+  border-radius: 50%;
+  top: 17px;
+  left: 0;
+  background: #f8faf0;
+}
+.ownership-trial-route > i:last-child {
+  left: auto;
+  right: 0;
+}
+.ownership-trial-route > b {
+  position: absolute;
+  left: 50%;
+  top: 12px;
+  width: 20px;
+  height: 20px;
+  border: 1px solid #b0c095;
+  background: #e4ebd6;
+  transform: rotate(45deg);
+}
+.ownership-trial-active {
+  margin-bottom: 20px;
+}
+.ownership-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  padding: 13px 24px;
+  border-top: 1px solid #d0dac1;
+  background: #e8ecde;
+  font-size: 9px;
+  line-height: 1.6;
+  color: #8b977b;
+}
+.ownership-footer > span:last-child {
+  flex-shrink: 0;
+  color: #a0aa90;
+  font-size: 8px;
+}
+.world-time {
+  color: #bfceaa;
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  letter-spacing: 1px;
+  margin-left: 6px;
+  white-space: nowrap;
+}
+#vehicle-hud > #vehicle-condition {
+  display: block;
+  margin: 7px 0 0;
+  color: #d5dcbf;
+  font-size: 7px;
+  line-height: 1.5;
+  letter-spacing: 0.3px;
+  font-variant-numeric: tabular-nums;
+}
+.open-ownership {
+  pointer-events: auto;
+  padding: 10px 13px;
+  border: 1px solid #c6d1ba30;
+  border-radius: 3px;
+  background: #233e2fc9;
+  color: #e0e6d2;
+  font-size: 9px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.open-ownership:hover {
+  background: #34533c;
+  border-color: #b8c99b80;
+}
+#ownership-panel button:focus-visible {
+  outline: 2px solid #a2b574;
+  outline-offset: 3px;
+}
+.open-ownership kbd {
+  color: #a8bb91;
+  font-size: 8px;
+  border: 1px solid #69835d55;
+  border-radius: 2px;
+  padding: 3px 4px;
+}
+@media (max-width: 1100px) {
+  .ownership-overlay {
+    padding: 16px;
+  }
+  .ownership-window {
+    height: calc(100dvh - 32px);
+  }
+  .ownership-layout {
+    grid-template-columns: 175px minmax(0, 1fr);
+  }
+  .ownership-nav {
+    padding: 16px 10px;
+  }
+  .ownership-nav > button {
+    padding: 14px 9px;
+    gap: 8px;
+    font-size: 10px;
+  }
+  .ownership-content {
+    padding: 21px 20px 30px;
+  }
+  .ownership-card {
+    padding: 17px;
+  }
+  .ownership-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .ownership-metric > strong {
+    font-size: 24px;
+  }
+  .open-ownership {
+    padding: 9px;
+  }
+}
+@media (max-width: 750px) {
+  .ownership-overlay {
+    padding: 0;
+  }
+  .ownership-window {
+    width: 100%;
+    height: 100dvh;
+    border-radius: 0;
+    border: 0;
+  }
+  .ownership-header {
+    padding: 21px 19px 17px;
+    gap: 12px;
+  }
+  .ownership-header .company-tag {
+    font-size: 6px;
+    letter-spacing: 1.15px;
+    margin-bottom: 8px;
+  }
+  .ownership-header h2 {
+    font-size: 28px;
+  }
+  .ownership-header p {
+    font-size: 10px;
+  }
+  #ownership-close {
+    width: 30px;
+    height: 30px;
+    font-size: 23px;
+  }
+  .ownership-layout {
+    display: flex;
+    flex-direction: column;
+  }
+  .ownership-nav {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+    border-right: 0;
+    border-bottom: 1px solid #c9d3bb;
+    padding: 9px 12px;
+    overflow: visible;
+    flex-shrink: 0;
+  }
+  .ownership-nav > button {
+    display: block;
+    text-align: center;
+    margin: 0;
+    min-width: 0;
+    padding: 9px 5px;
+    font-size: 9px;
+  }
+  .ownership-nav > button small {
+    display: none;
+  }
+  .ownership-nav > button.active {
+    box-shadow: inset 0 -2px #b58c58;
+  }
+  .ownership-cash {
+    display: none;
+  }
+  .ownership-content {
+    padding: 20px 17px 28px;
+    flex: 1;
+  }
+  .ownership-intro {
+    padding-bottom: 18px;
+    margin-bottom: 18px;
+  }
+  .ownership-intro h3 {
+    font-size: 26px;
+  }
+  .ownership-intro p,
+  .ownership-card p,
+  .ownership-empty p {
+    font-size: 11px;
+  }
+  .ownership-feature-grid,
+  .ownership-catalog,
+  .ownership-homes {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 13px;
+  }
+  .ownership-card {
+    padding: 19px;
+  }
+  .ownership-card h3 {
+    font-size: 24px;
+  }
+  .ownership-car-art {
+    max-height: 155px;
+    margin: 10px 0 17px;
+  }
+  .ownership-metrics {
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+  .ownership-metric {
+    padding: 14px 12px;
+  }
+  .ownership-metric > strong {
+    font-size: 23px;
+  }
+  .ownership-metric > small {
+    font-size: 8px;
+  }
+  .ownership-metric > span {
+    font-size: 6px;
+  }
+  .ownership-house-art {
+    height: 145px;
+  }
+  .ownership-footer {
+    padding: 10px 16px;
+    font-size: 8px;
+    gap: 8px;
+  }
+  .ownership-footer > span:last-child {
+    font-size: 7px;
+  }
+  .ownership-milestone {
+    grid-template-columns: 32px minmax(0, 1fr);
+    gap: 12px;
+  }
+  .ownership-milestone-check {
+    width: 32px;
+    height: 39px;
+    font-size: 21px;
+  }
+  .ownership-milestone .company-action {
+    width: 100%;
+  }
+  .world-time {
+    font-size: 9px;
+    letter-spacing: 0.3px;
+  }
+  .open-ownership {
+    width: 36px;
+    height: 36px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+  }
+  .open-ownership > span {
+    display: none;
+  }
+  .open-ownership kbd {
+    border: 0;
+    padding: 0;
+    font-size: 10px;
+    color: #d2ddc0;
+  }
+}
+@media (max-width: 600px) {
+  .game-header {
+    padding-left: 17px;
+    padding-right: 17px;
+    gap: 9px;
+  }
+  .game-header .hud-brand,
+  .game-header .location-pill {
+    display: none;
+  }
+  .game-header .finance {
+    margin-left: 0;
+    margin-right: auto;
+  }
+  .game-header .world-time {
+    position: absolute;
+    top: 69px;
+    right: 19px;
+    margin-left: 0;
   }
 }

@@ -73,6 +73,10 @@ function createPhotographicSky(texture, haze) {
       panorama: { value: texture },
       hazeColour: { value: haze.color },
       skyExposure: { value: 0.84 },
+      daylight: { value: 1 },
+      cloudiness: { value: 0 },
+      rain: { value: 0 },
+      atmosphereTime: { value: 0 },
     },
     vertexShader: `varying vec3 vDirection;
       void main() {
@@ -83,7 +87,16 @@ function createPhotographicSky(texture, haze) {
     fragmentShader: `uniform sampler2D panorama;
       uniform vec3 hazeColour;
       uniform float skyExposure;
+      uniform float daylight;
+      uniform float cloudiness;
+      uniform float rain;
+      uniform float atmosphereTime;
       varying vec3 vDirection;
+      float skyHash(vec3 p) { return fract(sin(dot(p,vec3(127.1,311.7,74.7)))*43758.5453); }
+      float skyNoise(vec2 p) {
+        vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);
+        return mix(mix(skyHash(vec3(i,0.0)),skyHash(vec3(i+vec2(1.0,0.0),0.0)),f.x),mix(skyHash(vec3(i+vec2(0.0,1.0),0.0)),skyHash(vec3(i+vec2(1.0),0.0)),f.x),f.y);
+      }
       void main() {
         vec3 direction = normalize(vDirection);
         // Only sample the clean sky cap above 56 degrees: the source panorama
@@ -93,7 +106,24 @@ function createPhotographicSky(texture, haze) {
         vec2 uv = vec2(atan(sampleDirection.z, sampleDirection.x) * 0.159154943 + 0.5, asin(sampleDirection.y) * 0.318309886 + 0.5);
         vec3 radiance = texture2D(panorama, uv).rgb * skyExposure;
         float clearSky = smoothstep(0.02, 0.24, direction.y);
-        gl_FragColor = vec4(mix(hazeColour, radiance, clearSky), 1.0);
+        vec3 dayColour=mix(hazeColour,radiance,clearSky);
+        vec2 cloudUv=direction.xz/max(direction.y+0.55,0.12)*2.6+vec2(atmosphereTime*0.0021,atmosphereTime*0.0007);
+        float clouds=skyNoise(cloudUv)*0.65+skyNoise(cloudUv*2.1)*0.24+skyNoise(cloudUv*4.2)*0.11;
+        float cloudMask=smoothstep(0.27,0.77,clouds)*cloudiness;
+        vec3 cloudColour=mix(vec3(0.39,0.45,0.49),vec3(0.68,0.72,0.75),clouds);
+        dayColour=mix(dayColour,cloudColour,cloudMask*0.88);
+        dayColour=mix(dayColour,vec3(0.24,0.30,0.34),rain*0.35);
+        float horizon=pow(1.0-clamp(direction.y,0.0,1.0),3.0);
+        vec3 nightColour=mix(vec3(0.004,0.008,0.018),vec3(0.025,0.041,0.063),horizon);
+        vec3 starCell=direction*360.0;
+        float stars=step(0.996,skyHash(floor(starCell)))*pow(max(0.0,1.0-length(fract(starCell)-0.5)*2.0),10.0);
+        nightColour+=vec3(0.78,0.85,1.0)*stars*(1.0-cloudiness)*smoothstep(0.03,0.2,direction.y);
+        float moonDot=dot(direction,normalize(vec3(-0.45,0.66,0.60)));
+        float moonDisc=smoothstep(0.99991,0.99997,moonDot);
+        float moonGlow=pow(max(moonDot,0.0),700.0)*0.035;
+        nightColour+=vec3(0.85,0.91,1.0)*(moonDisc*1.25+moonGlow)*(1.0-cloudiness*0.84);
+        nightColour=mix(nightColour,vec3(0.012,0.019,0.029),rain*0.45);
+        gl_FragColor=vec4(mix(nightColour,dayColour,daylight),1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }`,
@@ -131,6 +161,16 @@ export function createVisuals(renderer, scene, camera, quality = "medium") {
   const lightRight = new THREE.Vector3();
   const lightUp = new THREE.Vector3();
   const { texture: panorama, sunDirection } = photographicEnvironment();
+  const photographedSun = sunDirection.clone();
+  const moonDirection = new THREE.Vector3(-0.45, 0.66, 0.6).normalize();
+  const upAxis = new THREE.Vector3(0, 1, 0);
+  const nightColours = {
+    moon: new THREE.Color(0x9fbce8),
+    sky: new THREE.Color(0x5a76a0),
+    ground: new THREE.Color(0x232c3d),
+    clouds: new THREE.Color(0x819098),
+    haze: new THREE.Color(0x172638),
+  };
   const pmrem = new THREE.PMREMGenerator(renderer);
   const reflection = pmrem.fromEquirectangular(panorama);
   pmrem.dispose();
@@ -265,6 +305,35 @@ export function createVisuals(renderer, scene, camera, quality = "medium") {
     configurePipeline();
   }
 
+  function setAtmosphere(values = {}) {
+    if (disposed) return;
+    const day = THREE.MathUtils.clamp(Number(values.daylight ?? 1) || 0, 0, 1);
+    const clouds = THREE.MathUtils.clamp(Number(values.cloudiness) || 0, 0, 1);
+    const rain = THREE.MathUtils.clamp(Number(values.rain) || 0, 0, 1);
+    const night = 1 - day;
+    sky.material.uniforms.daylight.value = day;
+    sky.material.uniforms.cloudiness.value = clouds;
+    sky.material.uniforms.rain.value = rain;
+    sky.material.uniforms.atmosphereTime.value = Number(values.elapsed) || 0;
+    sun.intensity = (6.2 * day + 0.22 * night) * (1 - clouds * 0.68);
+    sun.color.set(0xfff1dd).lerp(nightColours.moon, night);
+    hemisphere.intensity = 0.14 * day + 0.095 * night;
+    hemisphere.color.set(0xc6dded).lerp(nightColours.sky, night);
+    hemisphere.groundColor.set(0x625c4c).lerp(nightColours.ground, night);
+    scene.environmentIntensity =
+      (0.44 * day + 0.055 * night) * (1 - clouds * 0.15);
+    renderer.toneMappingExposure = 0.95 + night * 0.16;
+    haze.color
+      .set(0xb9cbd3)
+      .lerp(nightColours.clouds, clouds * 0.7)
+      .lerp(nightColours.haze, night);
+    haze.near = 280 - rain * 150;
+    haze.far = 2450 - rain * 1500 - clouds * 160;
+    sunDirection.copy(photographedSun).lerp(moonDirection, night).normalize();
+    lightRight.crossVectors(upAxis, sunDirection).normalize();
+    lightUp.crossVectors(sunDirection, lightRight).normalize();
+  }
+
   function update(_dt = 0, focusPosition = focus, _day = 1) {
     if (disposed) return;
     if (Number.isFinite(focusPosition?.x) && Number.isFinite(focusPosition?.z))
@@ -340,6 +409,7 @@ export function createVisuals(renderer, scene, camera, quality = "medium") {
     render,
     resize,
     setQuality,
+    setAtmosphere,
     dispose,
     get ready() {
       return ready;

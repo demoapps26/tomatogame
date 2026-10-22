@@ -1,3 +1,5 @@
+import { normalizeOwnershipState } from "./ownership-state.js";
+
 /**
  * Tomato Republic company simulation. Values are serializable; every command
  * returns a new state so saves and UI previews cannot mutate the running firm.
@@ -855,6 +857,7 @@ export function createCompany(name = baseName) {
   };
   state.contracts = offersFor(state);
   state.operations = normalizeOperationsState(null, state);
+  state.ownership = normalizeOwnershipState(null);
   log(
     state,
     "A chave de Anselmo",
@@ -983,6 +986,7 @@ export function normalizeCompany(saved) {
       : null;
   boundStats(state);
   state.operations = normalizeOperationsState(saved.operations, state);
+  state.ownership = normalizeOwnershipState(saved.ownership);
   return state;
 }
 function result(ok, message, state, extra = {}) {

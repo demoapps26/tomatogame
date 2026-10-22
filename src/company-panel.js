@@ -11,6 +11,7 @@ import {
   buyFleetVehicle,
   dispatchFleet,
 } from "./operations.js";
+import { getOwnershipView } from "./ownership.js";
 const $ = (id) => document.getElementById(id);
 const escape = (value) =>
   String(value ?? "").replace(
@@ -44,6 +45,7 @@ export function createCompanyPanel({
   close,
   notify,
   navigateToPlace,
+  openOwnership,
 }) {
   let tab = "overview",
     lastReport = null;
@@ -78,7 +80,8 @@ export function createCompanyPanel({
   function render() {
     const company = getCompany(),
       view = getCompanyView(company),
-      operations = getOperationsView(company);
+      operations = getOperationsView(company),
+      ownership = getOwnershipView(company);
     const reportToShow = lastReport || company.lastReport;
     $("company-title").textContent = company.name;
     const initials = company.name
@@ -115,6 +118,10 @@ export function createCompanyPanel({
     $("company-summary").insertAdjacentHTML(
       "beforeend",
       `<article class="company-card company-field-card"><span class="company-tag">A EMPRESA ACONTECE LÁ FORA</span><h3>Conhece o teu negócio de perto.</h3><p>Entra na loja, rega e colhe na estufa, visita os clientes e acompanha as carrinhas no terreno. Aproxima-te e usa E para interagir.</p><div class="company-field-stats"><span><b>${operations.shop.stock}</b> caixas na loja</span><span><b>${operations.fleet.length}</b> carrinhas próprias</span><span><b>${operations.shop.sold}</b> caixas vendidas</span></div>${navigateToPlace ? `<div class="company-inline-actions"><button class="company-action secondary" data-action="visit" data-id="shop-counter">Visitar a loja</button><button class="company-action secondary" data-action="visit" data-id="greenhouse-water">Ir à estufa</button><button class="company-action secondary" data-action="visit" data-id="fleet-depot">Ver a frota</button><button class="company-action secondary" data-action="visit" data-id="rui">Conhecer um cliente</button></div>` : ""}</article>`,
+    );
+    $("company-summary").insertAdjacentHTML(
+      "beforeend",
+      `<article class="company-card company-field-card"><span class="company-tag">PATRIMÓNIO · A VIDA NA CIDADE</span><h3>Uma empresa. Um lugar para regressar.</h3><p>Visita o stand para comprar um automóvel, conhece as casas por dentro e conquista marcos com o teu trabalho. Estas compras usam a caixa da empresa e ficam no diário.</p><div class="company-field-stats"><span><b>${ownership.vehicles.length}</b> viaturas próprias</span><span><b>${ownership.properties.filter((property) => property.owned).length}</b> imóveis</span><span><b>${ownership.milestones.filter((milestone) => milestone.claimed).length} / ${ownership.milestones.length}</b> marcos recebidos</span></div>${openOwnership ? `<div class="company-inline-actions"><button class="company-action secondary" data-action="ownership" data-id="garage" ${!isFounded() ? "disabled" : ""}>A tua garagem</button><button class="company-action secondary" data-action="ownership" data-id="homes" ${!isFounded() ? "disabled" : ""}>Casas e interiores</button><button class="company-action secondary" data-action="ownership" data-id="milestones" ${!isFounded() ? "disabled" : ""}>Marcos da história</button><button class="company-action secondary" data-action="ownership" data-id="trials" ${!isFounded() ? "disabled" : ""}>Percursos de condução</button></div>` : ""}</article>`,
     );
     const event = view.event;
     $("company-story").innerHTML =
@@ -205,6 +212,10 @@ export function createCompanyPanel({
     if (action === "visit" && navigateToPlace) {
       close();
       navigateToPlace(id);
+    }
+    if (action === "ownership" && openOwnership) {
+      close();
+      openOwnership(id);
     }
     if (action === "accept" && apply(acceptContract(current, id))) {
       trackContract(id);

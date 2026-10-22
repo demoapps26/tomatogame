@@ -1,6 +1,6 @@
 # Tomato Republic — Uma cidade, uma empresa, um legado 🍅
 
-**Versão 0.5.** Um jogo original para um jogador que junta exploração em terceira pessoa, condução e gestão de uma empresa de tomates. Esta versão melhora a imagem com materiais fotográficos, iluminação de ambiente HDR e mais detalhe próximo. Herdaste a pequena estufa de Anselmo, a última colheita e uma dívida de 5 000 €. Podes entrar na loja e na estufa, cuidar da colheita, negociar presencialmente e construir uma frota que trabalha enquanto exploras a cidade.
+**Versão 0.6.** Um jogo original para um jogador que junta exploração em terceira pessoa, condução e gestão de uma empresa de tomates. Esta versão acrescenta um stand com cinco modelos, três casas com interiores, oficina, percursos de condução e um ciclo de dia, noite e chuva. Herdaste a pequena estufa de Anselmo, a última colheita e uma dívida de 5 000 €. Podes entrar na loja e na estufa, cuidar da colheita, negociar presencialmente e construir uma frota que trabalha enquanto exploras a cidade.
 
 ## Jogar
 
@@ -18,7 +18,7 @@ Em equipamentos mais lentos, escolhe **Desempenho** no menu. O som e a sensibili
 
 ## Uma cidade maior
 
-Santa Tomata tem cerca de **2,13 km²**, **454 edifícios**, avenidas, bairros antigos, zona empresarial, universidade, cooperativa, mercado, complexo agrícola e porto. A expansão acrescenta parque, moradias, campus e orla costeira. Há locais de negócio identificados, tráfego e peões em movimento. Vale da Colheita e Porto Vermelho acrescentam dois territórios de cerca de 0,25 km² cada.
+Santa Tomata tem cerca de **2,13 km²**, **440 edifícios de bairro**, além dos novos imóveis e do stand, avenidas, bairros antigos, zona empresarial, universidade, cooperativa, mercado, complexo agrícola e porto. A expansão acrescenta parque, moradias, campus e orla costeira. Há locais de negócio identificados, tráfego e peões em movimento. Vale da Colheita e Porto Vermelho acrescentam dois territórios de cerca de 0,25 km² cada.
 
 A sede apresenta o nome da tua empresa. Novas estufas, câmara de frio/armazém e painéis solares tornam os investimentos visíveis no terreno. Os destinos comerciais ficam em Santa Tomata; seguir um contrato a partir de outro território regressa à cidade.
 
@@ -37,6 +37,24 @@ No depósito ou em **Empresa → Crescimento**, compra até **três carrinhas co
 Aceita uma encomenda e atribui-a a uma carrinha livre. A carga já reservada segue com a frota, e é cobrado o custo da viagem. A viatura percorre uma rota pela cidade, paga o contrato na chegada ao cliente e regressa ao depósito antes de ficar novamente disponível. Uma encomenda atribuída não pode ser entregue uma segunda vez pelo jogador.
 
 As viagens duram aproximadamente 45–80 segundos em cada sentido, conforme o destino. O progresso, os custos e as receitas ficam guardados. A simulação da frota e da loja pausa nos menus e nas conversas; não há receitas automáticas com o jogo fechado.
+
+## Uma garagem e uma casa
+
+Carrega em **G / Património** para consultar o catálogo, a garagem, os imóveis e os marcos. As compras são feitas presencialmente: marca uma visita, aproxima-te a pé e usa **E**. **T / Mapa** apresenta o mapa geral e permite marcar um destino na cidade.
+
+O **Santa Tomata Motors** expõe cinco modelos: Citadino 1.4 (1 400 €), Pick-up do Vale (2 100 €), Furgão Mercador (2 800 €), Serra 4x4 (4 500 €) e GT Vermelho (6 500 €). Têm carroçarias, aceleração, direção, travagem, velocidade e consumo distintos. As compras usam a tesouraria da empresa. Os veículos de rua continuam disponíveis como alternativa de transporte.
+
+A garagem guarda até cinco viaturas, uma de cada modelo. Os quilómetros consomem combustível e as colisões danificam o carro; o estado influencia o desempenho. Visita a **oficina** para abastecer, reparar ou levantar um veículo. O combustível custa 1,85 €/L; as reparações dependem dos danos. Posição, combustível, estado e distância ficam guardados, incluindo carros deixados noutro território.
+
+O **Apartamento da Ribeira** (1 800 €), a **Casa dos Jardins** (4 200 €) e a **Villa do Atlântico** (9 800 €) podem ser visitados por dentro e comprados. Há três níveis pagos de mobiliário visível. Uma casa base permite regressar a um lugar próprio após perder toda a vida na cidade. No ponto de descanso de uma casa comprada, usa **E** para recuperar a vida e o cesto e começar às 07:30. Só podes descansar uma vez por dia empresarial; o dia de gestão continua a avançar no painel Empresa.
+
+Cinco marcos acompanham entregas, vendas na loja, trabalho da frota, carros e casas. Cada recompensa exige atividade real e só pode ser recebida uma vez. Casas e viaturas pessoais não geram rendimentos passivos.
+
+## Percursos de condução
+
+Leva um carro ao **quadro de percursos**, junto ao stand, e usa **E**. Escolhe a **Volta do Bairro**, a **Rota do Mercado** ou a **Grande Volta da Costa**. Segue os arcos dourados e as setas, cruzando os pontos pela ordem indicada antes de acabar o tempo. A primeira conclusão paga um patrocínio de 200 €, 350 € ou 600 €; voltar a completar melhora o recorde sem repetir o prémio.
+
+O cronómetro e os recordes ficam guardados. Sair do veículo ou mudar de território cancela a tentativa. Os menus pausam o cronómetro, a cidade e a empresa.
 
 ## A empresa e a história
 
@@ -63,6 +81,8 @@ O dia empresarial só avança quando escolhes **Encerrar o dia**. Nesse momento 
 | Conduzir / sair / interagir / entregar | E                                        |
 | Correr / travar o veículo              | Espaço; Shift também permite correr      |
 | Empresa                                | B ou botão Empresa                       |
+| Património, garagem, casas e percursos | G ou botão Património                    |
+| Mapa geral e destinos                  | T ou botão Mapa                          |
 | Arremessar tomate a pé                 | Clique esquerdo; manter premido continua |
 | Recarregar                             | R                                        |
 | Pausa / retoma                         | Esc ou P                                 |
@@ -74,11 +94,15 @@ Ao conduzir, a câmara acompanha suavemente as curvas e ajusta a distância à v
 
 ## Guardar e continuar
 
-A campanha guarda automaticamente no navegador: empresa, decisões, dia, contratos aceites, saldo, posição, vida, munições, veículo utilizado, frota em viagem, loja e trabalhos da estufa. Recarregar a página permite continuar. As preferências de imagem e som também ficam guardadas. As campanhas da versão 0.3 são atualizadas sem apagar as decisões anteriores.
+A campanha guarda automaticamente no navegador: empresa, decisões, dia, contratos aceites, saldo, posição, vida, munições, veículo utilizado, frota em viagem, loja, trabalhos da estufa, carros próprios, casas, mobiliário, marcos, percursos, hora e clima. Recarregar a página permite continuar. As preferências de imagem e som também ficam guardadas. As campanhas das versões 0.3–0.5 são atualizadas sem apagar as decisões anteriores.
 
 Em **Empresa**, **Exportar progresso** cria um ficheiro JSON. **Importar progresso** permite continuar noutro navegador ou recuperar um ficheiro guardado. Usa a exportação antes de mudar de dispositivo ou de substituir a pasta do jogo: o armazenamento de ficheiros locais pode variar entre navegadores.
 
 **Nova história**, no menu, permite recomeçar após confirmar a substituição da campanha local. Os dados não são enviados para servidores.
+
+## Hora e clima
+
+Um ciclo de 24 horas demora cerca de 36 minutos de jogo ativo. O relógio e o clima pausam nos menus e ficam guardados. O menu permite escolher clima automático, céu limpo, nublado ou chuva. À noite, há estrelas, iluminação de janelas e candeeiros próximos; os faróis acompanham o carro. A chuva molha visualmente o asfalto e acrescenta som ambiente. O relógio da cidade é independente do dia empresarial.
 
 ## Imagem e desempenho
 
@@ -117,6 +141,13 @@ O build gera o **index.html** autónomo da raiz e as cópias em `dist/`. A vers�
 - `src/venues.js`: personagens de negócio, conversas e interações no terreno.
 - `src/fleet.js`: rotas e viaturas da frota autónoma.
 - `src/driving-camera.js`: acompanhamento da câmara de condução.
+- `src/ownership.js` e `src/ownership-state.js`: património, custos, manutenção, descanso e marcos.
+- `src/ownership-panel.js`: stand, oficina, casas e percursos.
+- `src/passenger-vehicles.js`: cinco modelos de veículos pessoais.
+- `src/estates-world.js`: stand, casas percorríveis e mobiliário.
+- `src/driving-jobs.js` e `src/race-course.js`: percursos, recordes e pontos de controlo.
+- `src/atmosphere.js`: relógio, clima, luzes locais e áudio ambiente.
+- `src/city-map-panel.js`: mapa geral e seleção de destinos.
 - `src/world.js`: territórios, materiais, locais de negócio e expansão da sede.
 - `src/life.js`: tráfego e peões.
 - `src/graphics.js`: céu, iluminação, reflexos e modos de imagem.

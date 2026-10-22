@@ -28,7 +28,7 @@
           >
           <div class="edition">
             <span class="status-dot"></span> UM NOVO TERRITÓRIO
-            <span class="edition-number">VOL. 05</span>
+            <span class="edition-number">VOL. 06</span>
           </div>
         </header>
         <div class="menu-content">
@@ -43,7 +43,9 @@
               Herdaste uma estufa e uma promessa por cumprir. Funda a tua
               empresa, percorre a cidade e decide que futuro vais cultivar.
               Entra na loja, cuida da estufa e negoceia com os clientes. A tua
-              frota pode tratar das entregas enquanto exploras.
+              frota pode tratar das entregas enquanto exploras. Visita o stand,
+              escolhe uma casa e descobre a cidade ao volante, de dia ou à
+              noite.
             </p>
           </div>
           <div class="territory-heading">
@@ -119,7 +121,7 @@
               <span class="status-dot"></span
               ><span
                 >O teu território, ao teu ritmo.<small
-                  >EXPLORAÇÃO · LOJA · ESTUFA · FROTA</small
+                  >EMPRESA · AUTOMÓVEIS · CASAS · PERCURSOS</small
                 ></span
               >
             </div>
@@ -144,6 +146,15 @@
                 value="1"
                 aria-label="Sensibilidade do rato"
             /></label>
+            <label for="weather"
+              ><span>TEMPO</span
+              ><select id="weather">
+                <option value="auto">Tempo variável</option>
+                <option value="clear">Céu limpo</option>
+                <option value="cloudy">Nublado</option>
+                <option value="rain">Chuva</option>
+              </select></label
+            >
             <button
               id="mute"
               class="sound-button"
@@ -167,7 +178,7 @@
         <footer class="menu-footer">
           <span>PROTÓTIPO JOGÁVEL · 1 JOGADOR</span
           ><span>SEM PRESSA. SEM LIMITES PARA A IMAGINAÇÃO.</span
-          ><span class="footer-build">TOMATO REPUBLIC <i>05</i></span>
+          ><span class="footer-build">TOMATO REPUBLIC <i>06</i></span>
         </footer>
       </section>
 
@@ -178,6 +189,9 @@
             <span class="status-dot"></span
             ><span id="location">Santa Tomata</span>
           </div>
+          <time id="world-clock" class="world-time" aria-label="Hora na cidade"
+            >08:30</time
+          >
           <div class="finance">
             <span id="wanted" aria-label="Nível de alerta">☆☆☆☆☆</span>
             <div class="cash-balance" aria-label="Saldo da empresa em euros">
@@ -193,6 +207,22 @@
           >
             <span class="company-button-icon" aria-hidden="true"></span
             ><span>Empresa</span><kbd>B</kbd>
+          </button>
+          <button
+            id="open-ownership"
+            class="open-ownership"
+            type="button"
+            aria-label="Abrir garagem, casas e marcos, tecla G"
+          >
+            <span>Garagem e casas</span><kbd>G</kbd>
+          </button>
+          <button
+            id="open-city-map"
+            class="open-ownership open-city-map"
+            type="button"
+            aria-label="Abrir mapa da cidade, tecla T"
+          >
+            <kbd>T</kbd><span>Mapa</span>
           </button>
           <button id="pause" type="button" aria-label="Pausar jogo">
             <span></span><span></span>
@@ -239,6 +269,7 @@
         <div id="vehicle-hud" hidden>
           <strong id="speed">0</strong><span>KM/H</span
           ><small>E · SAIR DO VEÍCULO</small>
+          <span id="vehicle-condition">Viatura emprestada</span>
         </div>
         <div class="weapon-panel">
           <span class="weapon-category">ARREMESSO · TOMATE</span>
@@ -259,8 +290,10 @@
           ><span><kbd>CLIQUE</kbd> Atirar</span
           ><span><kbd>E</kbd> Interagir / conduzir</span
           ><span><kbd>ESPAÇO</kbd> Correr / travão</span
-          ><span><kbd>B</kbd> Empresa</span><span><kbd>M</kbd> Mapas</span
-          ><span><kbd>ESC</kbd> Pausa</span>
+          ><span><kbd>B</kbd> Empresa</span
+          ><span><kbd>G</kbd> Garagem e casas</span
+          ><span><kbd>T</kbd> Mapa da cidade</span
+          ><span><kbd>M</kbd> Mapas</span><span><kbd>ESC</kbd> Pausa</span>
         </div>
         <div id="touch-controls" aria-label="Controlos táteis">
           <div class="touch-pad">
