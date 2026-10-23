@@ -1,0 +1,21 @@
+TOMATO REPUBLIC — VERSÃO 0.10.0
+
+1. Extrai este ZIP para uma pasta no computador.
+2. Abre index.html no Chrome, Edge ou Firefox atualizado.
+3. Seleciona Santa Tomata e escolhe Entrar na cidade.
+4. Nas opções, Realismo apresenta o maior detalhe gráfico. Equilibrada reduz o custo.
+
+WASD: andar/conduzir. Rato: olhar. E: interagir/entrar/sair. P: pausa.
+B: empresa. T: mapa. J: trabalhos. V: modo fotografia. X: cancelar preparação manual.
+
+Na loja da sede, aproxima-te das caixas vazias e carrega em E para preparar um lote.
+Precisas de seis caixas no stock e 8 euros para as embalagens. Recolhe a amostra
+na estufa, transporta cada caixa, pesa-a, recupera-a, sela e expede.
+Só recebes quando as seis caixas estiverem prontas. O progresso fica guardado
+localmente no navegador; usa Exportar campanha no menu para fazer uma cópia.
+
+Todos os recursos estão incorporados em index.html. Depois de abrir, o jogo
+não precisa de ligações externas. Os créditos também estão disponíveis no menu.
+
+Código-fonte desta versão:
+https://github.com/demoapps26/tomatogame/tree/3e4cd5f3eb5cdd720f25596d14a3a24dbf4a8372
