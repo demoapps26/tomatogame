@@ -153,6 +153,11 @@ export function createCityLife(scene, world, quality = "medium") {
   let populationCheck = 2;
   let disposed = false;
 
+  function pedestrianGroundAt(x, z) {
+    const height = world.groundHeightAt?.(x, z);
+    return Number.isFinite(height) ? height : 0;
+  }
+
   function collides(x, z, radius = 1.15) {
     const bounds = world.bounds;
     if (
@@ -251,7 +256,11 @@ export function createCityLife(scene, world, quality = "medium") {
       entity.distance = candidate.distance;
       entity.yaw = candidate.yaw;
       entity.speed = 0;
-      entity.position.set(candidate.x, 0, candidate.z);
+      entity.position.set(
+        candidate.x,
+        pedestrian ? pedestrianGroundAt(candidate.x, candidate.z) : 0,
+        candidate.z,
+      );
       entity.actor.group.rotation.y = entity.yaw;
       return true;
     }
@@ -289,6 +298,8 @@ export function createCityLife(scene, world, quality = "medium") {
         !collides(point.x, point.z, radius)
       ) {
         entity.position.copy(point);
+        if (pedestrian)
+          entity.position.y = pedestrianGroundAt(point.x, point.z);
         entity.yaw = Math.atan2(tangent.x, tangent.z);
         entity.actor.group.rotation.y = entity.yaw;
         return true;
@@ -507,6 +518,10 @@ export function createCityLife(scene, world, quality = "medium") {
         pedestrian.distance = oldDistance;
         pedestrian.speed = 0;
       }
+      pedestrian.position.y = pedestrianGroundAt(
+        pedestrian.position.x,
+        pedestrian.position.z,
+      );
       const targetYaw = Math.atan2(tangent.x, tangent.z);
       const delta = Math.atan2(
         Math.sin(targetYaw - pedestrian.yaw),

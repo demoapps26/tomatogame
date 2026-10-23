@@ -26,6 +26,13 @@ const CATEGORIES = [
   ["trials", "Percursos"],
 ];
 const TYPES = {
+  "field-jobs": {
+    category: "company",
+    color: "#c4ac70",
+    symbol: "J",
+    tag: "Trabalhos da quinta",
+    note: "Aceita no quadro junto à sede e cumpre os objetivos na cidade.",
+  },
   company: {
     category: "company",
     color: "#b6c98e",

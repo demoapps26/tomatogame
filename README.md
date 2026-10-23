@@ -1,6 +1,8 @@
 # Tomato Republic — Uma cidade, uma empresa, um legado 🍅
 
-**Versão 0.8.** Um jogo original para um jogador que junta exploração em terceira pessoa, condução e gestão de uma empresa de tomates. Esta versão acrescenta um modo fotografia, revê o céu e a luz ao longo do dia, melhora a marcha das personagens e dá mais detalhe às ruas. A cidade inclui vidro com interiores aparentes, fachadas e passeios detalhados, árvores de quatro espécies, personagens com roupa e proporções revistas, casas mais mobiladas e um desportivo com carroçaria e interior de um modelo 3D profissional. Herdaste a pequena estufa de Anselmo, a última colheita e uma dívida de 5 000 €. Podes entrar na loja e na estufa, cuidar da colheita, negociar presencialmente e construir uma frota que trabalha enquanto exploras a cidade.
+**Versão 0.9.0.** Um jogo original para um jogador que junta exploração em terceira pessoa, condução e gestão de uma empresa de tomates. Quatro edifícios do centro recebem arquitetura detalhada com fachadas, toldos e varandas; as personagens passam a usar corpos completos MakeHuman, com roupa, pele fotográfica e olhos abertos. A condução ganha direção progressiva, peso nas curvas e menos aderência à chuva. Há três trabalhos com recolhas e entregas físicas, novos tomateiros e superfícies que se molham com o clima.
+
+Herdaste a pequena estufa de Anselmo, a última colheita e uma dívida de 5 000 €. Podes entrar na loja e na estufa, cuidar da colheita, negociar presencialmente e construir uma frota que trabalha enquanto exploras a cidade. O jogo corre no navegador e guarda o progresso localmente; continua a ser uma experiência singleplayer com condução e animação de estilo arcade.
 
 ## Jogar
 
@@ -13,14 +15,17 @@ No GitHub, escolhe **Code → Download ZIP**, extrai a pasta e abre **index.html
 5. Caminha ou conduz até ao marcador dourado e carrega em **E** para entregar. Só recebes depois da entrega física.
 6. Abre **Empresa** ou carrega em **B** para investir, marcar uma visita, acompanhar as contas e encerrar o dia.
 7. Visita a loja e a estufa junto à sede. Aproxima-te do balcão, do ponto de rega ou das plantas e carrega em **E**.
+8. Usa **J / Trabalhos** para consultar o caderno de Anselmo. Para aceitar um trabalho, aproxima-te a pé do **quadro da quinta junto à sede**; depois recolhe e entrega nos pontos indicados com **E**.
 
 O GT estacionado junto à sede pode ser conduzido com **E** desde o início, como viatura emprestada. O stand continua a vender a versão própria por 6 500 €.
 
-Em equipamentos mais lentos, escolhe **Desempenho** no menu. O som e a sensibilidade do rato também podem ser ajustados.
+Em equipamentos mais lentos, escolhe **Desempenho** no menu. Sombras e filtros mudam de imediato; recarrega a página para aplicar também a escolha dos modelos do território. O progresso fica guardado. O som e a sensibilidade do rato também podem ser ajustados.
 
 ## Uma cidade maior
 
 Santa Tomata tem cerca de **2,13 km²**, **440 edifícios de bairro**, além dos novos imóveis e do stand, avenidas, bairros antigos, zona empresarial, universidade, cooperativa, mercado, complexo agrícola e porto. A expansão acrescenta parque, moradias, campus e orla costeira. Há locais de negócio identificados, tráfego e peões em movimento. Vale da Colheita e Porto Vermelho acrescentam dois territórios de cerca de 0,25 km² cada.
+
+Em **Equilibrada** e **Realismo**, quatro edifícios junto à sede usam dois modelos detalhados do cenário Bistro: um café de esquina e uma casa urbana. Têm fachadas, coberturas, caixilharia e materiais próprios; são exteriores e não podem ser visitados por dentro. Em **Desempenho**, mantêm-se os edifícios mais leves.
 
 A sede apresenta o nome da tua empresa. Novas estufas, câmara de frio/armazém e painéis solares tornam os investimentos visíveis no terreno. Os destinos comerciais ficam em Santa Tomata; seguir um contrato a partir de outro território regressa à cidade.
 
@@ -31,6 +36,12 @@ A **loja da sede** tem entrada aberta, balcão, prateleiras e produtos. Fala com
 Na **estufa**, entra pelo corredor central e usa os pontos de rega e colheita. Regar tem um custo e melhora a qualidade; colher acrescenta uma quantidade limitada de caixas. Cada trabalho só pode ser realizado uma vez por dia empresarial, além da produção da equipa ao encerrar o dia.
 
 Os clientes têm personagens e locais próprios: **Marta** na cooperativa, **Rui** no mercado, **Sofia** nos restaurantes, **Artur** no porto e **Leonor** na universidade. Aproxima-te a pé e carrega em **E** para conversar. Podes propor um acordo justo, uma seleção premium ou fornecimento em volume. Qualidade e reputação determinam quais propostas são possíveis. Cada cliente negoceia um novo acordo por dia; depois aceitas a encomenda e escolhes como a entregar.
+
+## Três trabalhos da quinta
+
+O **quadro da quinta**, junto à sede, apresenta **A primeira ronda** (300 €), **O lote desaparecido** (500 €) e **Selo de origem** (750 €). Carrega em **J** para consultar os percursos; a aceitação exige estar a pé junto ao quadro. Cada trabalho tem um prazo, etapas pela ordem indicada e uma recompensa única.
+
+Recolhe amostras ou documentos com **E**, desloca-te à cooperativa, mercado, instituto ou porto e entrega presencialmente. Algumas etapas exigem uma viatura e outras exigem sair dela. Recuperar o lote no cais também pode provocar um confronto com tomates. O objetivo atual fica marcado e pode ser seguido pelo painel. Os menus pausam o prazo; o progresso e as recompensas ficam guardados.
 
 ## Uma frota que faz entregas
 
@@ -85,6 +96,7 @@ O dia empresarial só avança quando escolhes **Encerrar o dia**. Nesse momento 
 | Empresa                                | B ou botão Empresa                       |
 | Património, garagem, casas e percursos | G ou botão Património                    |
 | Mapa geral e destinos                  | T ou botão Mapa                          |
+| Trabalhos da quinta                    | J ou botão Trabalhos                     |
 | Modo fotografia                        | V ou botão Fotografia                    |
 | Arremessar tomate a pé                 | Clique esquerdo; manter premido continua |
 | Recarregar                             | R                                        |
@@ -93,7 +105,7 @@ O dia empresarial só avança quando escolhes **Encerrar o dia**. Nesse momento 
 
 O combate com tomates continua disponível como atividade de exploração. As patrulhas não atacam indiscriminadamente quem começa a gerir a empresa na cidade. No telemóvel, arrasta o cenário para mirar e usa os controlos no ecrã.
 
-Ao conduzir, a câmara acompanha suavemente as curvas e ajusta a distância à velocidade. O rato permite olhar em redor; cerca de dois segundos depois do último movimento, a vista regressa à direção do carro. A marcha atrás mantém a orientação estável.
+Ao conduzir, acelera e trava de forma progressiva: a direção responde ao movimento do volante, as curvas têm inércia e o piso molhado reduz a aderência. **S** trava antes de iniciar a marcha atrás; **Espaço** aplica uma travagem mais forte. A câmara acompanha suavemente as curvas e ajusta a distância à velocidade. O rato permite olhar em redor; cerca de dois segundos depois do último movimento, a vista regressa à direção do carro. A marcha atrás mantém a orientação estável.
 
 ## Fotografar a cidade
 
@@ -103,7 +115,7 @@ Carrega em **V** ou no botão **Fotografia** para pausar a ação e enquadrar a 
 
 ## Guardar e continuar
 
-A campanha guarda automaticamente no navegador: empresa, decisões, dia, contratos aceites, saldo, posição, vida, munições, veículo utilizado, frota em viagem, loja, trabalhos da estufa, carros próprios, casas, mobiliário, marcos, percursos, hora e clima. Recarregar a página permite continuar. As preferências de imagem e som também ficam guardadas. As campanhas das versões 0.3–0.7 são atualizadas sem apagar as decisões anteriores.
+A campanha guarda automaticamente no navegador: empresa, decisões, dia, contratos aceites, saldo, posição, vida, munições, veículo utilizado, frota em viagem, loja, trabalhos da estufa e da quinta, carros próprios, casas, mobiliário, marcos, percursos, hora e clima. Recarregar a página permite continuar. As preferências de imagem e som também ficam guardadas. As campanhas das versões 0.3–0.8 são atualizadas sem apagar as decisões anteriores.
 
 Em **Empresa**, **Exportar progresso** cria um ficheiro JSON. **Importar progresso** permite continuar noutro navegador ou recuperar um ficheiro guardado. Usa a exportação antes de mudar de dispositivo ou de substituir a pasta do jogo: o armazenamento de ficheiros locais pode variar entre navegadores.
 
@@ -111,29 +123,35 @@ Em **Empresa**, **Exportar progresso** cria um ficheiro JSON. **Importar progres
 
 ## Hora e clima
 
-Um ciclo de 24 horas demora cerca de 36 minutos de jogo ativo. O relógio e o clima pausam nos menus e ficam guardados. O menu permite escolher clima automático, céu limpo, nublado ou chuva. À noite, há estrelas, iluminação de janelas e candeeiros próximos; os faróis acompanham o carro. A chuva molha visualmente o asfalto e acrescenta som ambiente. O relógio da cidade é independente do dia empresarial.
+Um ciclo de 24 horas demora cerca de 36 minutos de jogo ativo. O relógio e o clima pausam nos menus e ficam guardados. O menu permite escolher clima automático, céu limpo, nublado ou chuva. À noite, há estrelas, iluminação de janelas e candeeiros próximos; os faróis acompanham o carro. A chuva molha o asfalto, faz aparecer poças com reflexos, reduz a aderência dos veículos e acrescenta som ambiente. O relógio da cidade é independente do dia empresarial.
 
 ## Imagem e desempenho
 
-A versão 0.8 liga a direção solar à hora, acrescenta nuvens em camadas com bases sombreadas e contornos iluminados e distingue amanhecer, tarde e pôr-do-sol. Bancos, papeleiras, canteiros, cartazes e detalhes comerciais dão mais presença às frentes urbanas. A marcha tem fase contínua, apoio dos pés e transições suaves entre andar, correr e parar; a cabeça e o tronco têm movimentos discretos de atenção e respiração.
+A versão 0.9 acrescenta quatro edifícios detalhados no centro, com geometrias e texturas do cenário **Amazon Lumberyard Bistro**, distribuído pela NVIDIA GameWorks sob **MIT**. Os dois modelos mantêm o detalhe de cornijas, varandas, toldos, portadas e desgaste. Esta substituição está ativa em Equilibrada/Realismo e preserva os percursos e as ruas.
+
+As personagens atuais usam modelos completos **MakeHuman / MPFB**, sob **CC0**, com malha contínua, olhos abertos, cabelo, mãos e roupa ajustada ao esqueleto. Há variantes de trabalhador e cidadão. A marcha e a pose ao volante usam o esqueleto exportado; as animações continuam a ser geradas pelo jogo e não incluem captura de movimento ou animação facial.
+
+Os tomateiros têm folhas compostas, caules, tutores e frutos em diferentes fases de maturação. Reboco, pedra e asfalto ganham variação discreta e desgaste; a chuva altera a rugosidade das superfícies e forma poças.
+
+O céu acompanha a hora da cidade, com nuvens em camadas, bases sombreadas e contornos iluminados. A luz distingue amanhecer, tarde e pôr-do-sol. Bancos, papeleiras, canteiros, cartazes e detalhes comerciais dão mais presença às frentes urbanas. A marcha tem fase contínua, apoio dos pés e transições suaves entre andar, correr e parar; a cabeça e o tronco têm movimentos discretos de atenção e respiração.
 
 A versão 0.7 acrescenta janelas com **parallax interior**: cada vidro mostra uma sala com profundidade aparente, cortinas e ocupação próprias. À noite, apenas parte das janelas acende. Fachadas ganham frisos, rodapés de pedra, varandas de ferro, estores, toldos e placas portuguesas. O pavimento acompanha as frentes urbanas e liga-as aos passeios.
 
-As árvores têm troncos e ramos articulados, folhas recortadas com nervuras, quatro espécies e movimento discreto. As personagens usam malhas de roupa mais contínuas, pregas, costuras, mãos e calçado proporcionados. As casas recebem cozinhas, roupeiros, sofás, camas, cortinas e tapetes; no conforto 3, média/alta qualidade apresenta uma poltrona de modelo profissional com madeira curva e tecido.
+As árvores têm troncos e ramos articulados, folhas recortadas com nervuras, quatro espécies e movimento discreto. As casas recebem cozinhas, roupeiros, sofás, camas, cortinas e tapetes; no conforto 3, média/alta qualidade apresenta uma poltrona de modelo profissional com madeira curva e tecido.
 
 O **GT Vermelho** usa uma adaptação de **CarConcept**, de Eric Chadwick / Darmstadt Graphics Group GmbH, sob **CC BY 4.0**. A carroçaria, o habitáculo, as jantes e os travões vêm do modelo detalhado; rodas, direção, pintura, luzes e desgaste funcionam no jogo. O tráfego mistura citadinos, pick-ups, SUV e furgões. Em **Realismo**, o carro conduzido recebe reflexos locais da cidade, capturados por faces ao longo de vários fotogramas; as restantes qualidades usam o HDR incorporado.
 
 A versão usa **sete conjuntos de materiais fotográficos CC0**, com cor, normal OpenGL e rugosidade em 1K: asfalto, betão, reboco, solo, madeira, cerâmica e tecido. Os três canais mantêm a mesma escala em metros nas fachadas e no pavimento, incluindo edifícios instanciados.
 
-O ambiente HDR **Rooitou Park**, da Poly Haven, fornece iluminação e reflexos fotográficos. A direção inicial da luz parte da fotografia; na versão 0.8, acompanha o relógio da cidade. As sombras próximas têm maior resolução. O mapeamento de tons AgX preserva melhor o detalhe de materiais claros e metal pintado. A loja tem cerâmica de 60 cm e equipamento mais detalhado; fachadas ganham caleiras, tubos e caixilharias. Comida, bancas e plantas têm proporções revistas.
+O ambiente HDR **Rooitou Park**, da Poly Haven, fornece iluminação e reflexos fotográficos. A direção inicial da luz parte da fotografia; acompanha o relógio da cidade. As sombras próximas têm maior resolução. O mapeamento de tons AgX preserva melhor o detalhe de materiais claros e metal pintado. A loja tem cerâmica de 60 cm e equipamento mais detalhado; fachadas ganham caleiras, tubos e caixilharias. Comida, bancas e plantas têm proporções revistas.
 
-As personagens usam uma cabeça digitalizada com textura fotográfica e mapa de relevo, adaptada do modelo **Infinite, de Lee Perry-Smith**, sob licença **CC BY 3.0**. O scan mantém a expressão fixa e os olhos fechados do original; ainda não há animação facial. Os créditos estão disponíveis no menu, incluindo na distribuição de um único HTML.
+O recurso de cabeça digitalizada **Infinite, de Lee Perry-Smith**, usado nas versões anteriores, permanece preservado nas fontes com a respetiva licença **CC BY 3.0**. As personagens atuais MakeHuman usam as suas próprias cabeças e texturas. Os créditos estão disponíveis no menu, incluindo na distribuição de um único HTML.
 
 O modo **Realismo** acrescenta oclusão de contacto GTAO e antialiasing MSAA de até quatro amostras, conforme o suporte do equipamento. É a predefinição para novas preferências; as escolhas de qualidade anteriores são preservadas. **Equilibrada** e **Desempenho** reduzem o custo de renderização. Os materiais estão incorporados no HTML: o ficheiro é maior, mas continua sem downloads durante a partida.
 
-Os edifícios, a vegetação e os corpos das personagens continuam procedurais; o desportivo, a poltrona, os rostos e os materiais usam os recursos detalhados indicados nos créditos. A fidelidade de uma produção como GTA exige ainda cenários e animações de outra escala. Esta versão mantém um jogo autónomo de navegador, sem captura de movimento nem desempenho certificado em equipamento físico. As fontes e licenças dos recursos fotográficos estão em [ATTRIBUTIONS.md](ATTRIBUTIONS.md).
+Grande parte da cidade e a vegetação continuam procedurais; quatro edifícios centrais, os corpos MakeHuman, o desportivo, a poltrona e os materiais usam os recursos detalhados indicados nos créditos. É um jogo autónomo de navegador para um jogador, com cenários visitáveis limitados, física arcade e sem captura de movimento. O desempenho depende do equipamento e do modo de imagem; não há certificação em hardware físico. As fontes e licenças estão em [ATTRIBUTIONS.md](ATTRIBUTIONS.md).
 
-Capturas da versão 0.8, sem retoques e em qualidade Equilibrada: [PNG exportado pelo jogo](docs/screenshots/v0.8-photo.png) e [modo fotografia em utilização](docs/screenshots/v0.8-photo-mode.png).
+Capturas reais da versão 0.9, sem retoques e exportadas pelo jogo em Realismo: [cidade](docs/screenshots/v0.9-city.png), [personagem na estufa](docs/screenshots/v0.9-greenhouse.png) e [GT na cidade](docs/screenshots/v0.9-driving.png). As [verificações da versão](docs/validation/v0.9.md) incluem 128 testes automáticos, missões completas, condução, gestão e exportação de fotografias no navegador.
 
 ## Desenvolver
 
@@ -160,6 +178,8 @@ O build gera o **index.html** autónomo da raiz e as cópias em `dist/`. A vers�
 - `src/venues.js`: personagens de negócio, conversas e interações no terreno.
 - `src/fleet.js`: rotas e viaturas da frota autónoma.
 - `src/driving-camera.js`: acompanhamento da câmara de condução.
+- `src/driving-physics.js`: aceleração, direção, travagem e aderência à chuva.
+- `src/field-jobs.js` e `src/field-jobs-panel.js`: trabalhos físicos, prazos e recompensas únicas.
 - `src/ownership.js` e `src/ownership-state.js`: património, custos, manutenção, descanso e marcos.
 - `src/ownership-panel.js`: stand, oficina, casas e percursos.
 - `src/passenger-vehicles.js`: cinco modelos de veículos pessoais.
@@ -171,8 +191,11 @@ O build gera o **index.html** autónomo da raiz e as cópias em `dist/`. A vers�
 - `src/window-material.js`: vidro, reflexos, salas aparentes e ocupação noturna.
 - `src/urban-detail.js`: fachadas, toldos, varandas e pavimento urbano.
 - `src/vegetation.js`: quatro espécies de árvores, folhagem, ramos e vento.
-- `src/character-detail.js`: anatomia, roupa e animação das personagens.
+- `src/character-detail.js`: adaptação anterior das personagens, preservada nas fontes.
 - `src/vehicle-asset.js` e `src/furniture-asset.js`: modelos detalhados incorporados.
+- `src/district-asset.js`: arquitetura Bistro e materiais incorporados.
+- `src/human-asset.js`: personagens completas MakeHuman, esqueleto e materiais.
+- `src/tomato-crops.js`: tomateiros, frutos e arbustos.
 - `src/vehicle-reflections.js`: captura progressiva dos reflexos locais do veículo.
 - `src/life.js`: tráfego e peões.
 - `src/graphics.js`: céu, iluminação, reflexos e modos de imagem.
@@ -180,11 +203,15 @@ O build gera o **index.html** autónomo da raiz e as cópias em `dist/`. A vers�
 - `src/camera-obstruction.js`: proteção da câmara junto a paredes e mobiliário.
 - `src/material-library.js`: projeção física dos materiais fotográficos.
 - `src/photo-assets.js`: recursos incorporados, carregamento e partilha de texturas.
-- `src/scanned-head.js`: adaptação do modelo digitalizado e materiais de pele.
+- `src/scanned-head.js`: adaptação legada da cabeça digitalizada, preservada nas fontes.
 - `src/actors.js`: personagens, veículos e animações.
 - `src/navigation.js`: procura de caminhos.
 - `src/shell.html` e `style.css`: interface.
 
 Os testes cobrem decisões divergentes, duas campanhas completas, desfechos dependentes de entregas, contratos sem pagamentos duplicados, custos, prazos, investimentos, restauro e navegação. Verificam também a geometria e animação das personagens, a posição do condutor, as rodas e colisões do GT e a independência dos recursos dos novos modelos. `?diagnostics` disponibiliza uma cópia de leitura do estado em `window.tomatoDiagnostics.snapshot()` para diagnóstico.
 
-Three.js tem licença MIT, incluída em `THIRD_PARTY_NOTICES.txt` e no HTML. Os materiais fotográficos e o HDR têm licença CC0, com proveniência e hashes em `assets/photo-manifest.json`. A cabeça digitalizada tem licença CC BY 3.0, com originais e atribuição em `assets/head-scan/`. Para atualizar os bytes incorporados após alterar um recurso original, executa `node scripts/pack-photo-assets.mjs` e `node scripts/pack-head-scan.mjs` antes do build. Os modelos CarConcept e SheenChair mantêm originais, metadados legais e hashes em `assets/new-realism/`; `scripts/pack-vehicle-asset.mjs` e `scripts/pack-furniture-asset.mjs` reconstroem os dados incorporados. A cidade e os corpos são procedurais; não há recursos de GTA ou Counter-Strike.
+Three.js tem licença MIT, incluída em `THIRD_PARTY_NOTICES.txt` e no HTML. Os materiais fotográficos e o HDR têm licença CC0, com proveniência e hashes em `assets/photo-manifest.json`. A cabeça digitalizada legada tem licença CC BY 3.0, com originais e atribuição em `assets/head-scan/`. Para atualizar os bytes incorporados após alterar um recurso original, executa `node scripts/pack-photo-assets.mjs` e `node scripts/pack-head-scan.mjs` antes do build.
+
+Os modelos CarConcept e SheenChair mantêm originais, metadados legais e hashes em `assets/new-realism/`; `scripts/pack-vehicle-asset.mjs` e `scripts/pack-furniture-asset.mjs` reconstroem os dados incorporados.
+
+A arquitetura Bistro tem licença MIT NVIDIA e captura selecionada reproduzível em `assets/district-v9/`; `node scripts/pack-district-asset.mjs` reconstrói os dados sem rede. Os humanos MakeHuman têm dados gráficos CC0 e proveniência em `assets/human-v9/`; a reprodução com Blender/MPFB está documentada nesse diretório. O código de aplicação MPFB não é incorporado no jogo. Não há recursos de GTA ou Counter-Strike.

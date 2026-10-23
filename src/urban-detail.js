@@ -1317,6 +1317,8 @@ export function createUrbanDetail(scene, world, quality = "medium") {
           stats.pavedFrontages++;
         }
       }
+      // Authored facades already include their own balconies, frames and awnings.
+      if (site.detailedAsset) continue;
       // Stone plinths, floor courses and recessed-looking joints break flat walls
       // into human-sized construction, while the original wall supplies mass.
       faceBox(

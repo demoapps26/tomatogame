@@ -28,7 +28,7 @@
           >
           <div class="edition">
             <span class="status-dot"></span> UM NOVO TERRITÓRIO
-            <span class="edition-number">VOL. 08</span>
+            <span class="edition-number">VOL. 09</span>
           </div>
         </header>
         <div class="menu-content">
@@ -41,12 +41,11 @@
             </h1>
             <p id="menu-description">
               Herdaste uma estufa e uma promessa por cumprir. Funda a tua
-              empresa, percorre a cidade e decide que futuro vais cultivar.
-              Entra na loja, cuida da estufa e negoceia com os clientes. A tua
-              frota pode tratar das entregas enquanto exploras. Visita o stand,
-              escolhe uma casa e descobre a cidade ao volante, de dia ou à
-              noite. Descobre as ruas a uma nova luz e usa V para fotografar a
-              cidade, a tua personagem ou o GT junto à sede.
+              empresa, cuida da colheita e negoceia com os clientes. Percorre o
+              centro, descobre os trabalhos no quadro junto à sede e faz as
+              recolhas e entregas no terreno. Investe na frota, escolhe uma casa
+              e sente as curvas ao volante, com sol ou chuva. Usa V para
+              fotografar a cidade e a tua história.
             </p>
           </div>
           <div class="territory-heading">
@@ -237,6 +236,14 @@
           <span aria-hidden="true">◉</span
           ><span class="photo-label">Fotografia</span><kbd>V</kbd>
         </button>
+        <button
+          id="open-jobs"
+          type="button"
+          aria-label="Abrir trabalhos da quinta, tecla J"
+        >
+          <span aria-hidden="true">▤</span
+          ><span class="jobs-label">Trabalhos</span><kbd>J</kbd>
+        </button>
         <div class="mission-card">
           <div class="mission-heading">
             <span class="mission-icon" aria-hidden="true">↗</span
@@ -276,7 +283,8 @@
           </div>
         </div>
         <div id="vehicle-hud" hidden>
-          <strong id="speed">0</strong><span>KM/H</span
+          <strong id="speed">0</strong
+          ><span>KM/H · <b id="vehicle-gear">N</b></span
           ><small>E · SAIR DO VEÍCULO</small>
           <span id="vehicle-condition">Viatura emprestada</span>
         </div>
@@ -673,7 +681,7 @@
             >, licença CC0.
           </p>
           <p>
-            Modelo da cabeça «Infinite, 3D Head Scan»:
+            Recurso legado de cabeça «Infinite, 3D Head Scan»:
             <a
               href="https://www.triplegangers.com/"
               target="_blank"
@@ -685,7 +693,38 @@
               target="_blank"
               rel="noopener"
               >CC BY 3.0</a
-            >. Escala, orientação e geometria adaptadas para as personagens.
+            >. Usado nas versões anteriores; fonte e atribuição preservadas. As
+            personagens atuais MakeHuman usam cabeças próprias.
+          </p>
+          <p>
+            Personagens completas MakeHuman / MPFB: MakeHuman team, Data
+            Collection AB, Joel Palmius e Jonas Hauquier,
+            <a
+              href="https://creativecommons.org/publicdomain/zero/1.0/"
+              target="_blank"
+              rel="noopener"
+              >CC0 1.0</a
+            >. Corpo, pele, cabelo, olhos, roupa e esqueleto adaptados para as
+            personagens do jogo. São dados gráficos CC0; o código da aplicação
+            MPFB é uma ferramenta de produção externa.
+          </p>
+          <p>
+            Arquitetura «Amazon Lumberyard Bistro»: NVIDIA GameWorks, Copyright
+            © 2023,
+            <a
+              href="https://github.com/NVIDIAGameWorks/rtxdi-assets/tree/1da7b749ef0e3fb606ab46dde8e5bfbacd078a02/bistro"
+              target="_blank"
+              rel="noopener"
+              >fonte oficial</a
+            >, licença
+            <a
+              href="https://raw.githubusercontent.com/NVIDIAGameWorks/rtxdi-assets/1da7b749ef0e3fb606ab46dde8e5bfbacd078a02/LICENSE"
+              target="_blank"
+              rel="noopener"
+              >MIT</a
+            >. Dois exteriores selecionados, materiais e texturas adaptados para
+            quatro edifícios do centro. Aviso MIT integral incluído neste
+            ficheiro.
           </p>
           <p>
             Automóvel «CarConcept»: Eric Chadwick / Darmstadt Graphics Group
@@ -705,8 +744,13 @@
             iluminação preparados para o jogo.
           </p>
           <p>
-            Motor gráfico: Three.js, licença MIT. As atribuições completas
-            também estão incluídas neste ficheiro.
+            Poltrona «SheenChair»: Eric Chadwick / Wayfair, LLC, © 2020,
+            licença CC0 1.0. Geometria e materiais adaptados para as casas.
+          </p>
+          <p>
+            Motor gráfico: Three.js; descompressão: fflate / Arjun Barrett,
+            ambos sob MIT. As atribuições completas também estão incluídas neste
+            ficheiro.
           </p>
           <button class="primary-button" autofocus>Voltar ao jogo</button>
         </form>

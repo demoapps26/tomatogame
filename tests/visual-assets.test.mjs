@@ -449,3 +449,146 @@ test("the seated driver reaches forward, fits the GT cabin and preserves its cal
     dispose(actor.group);
   }
 });
+
+function validateSkinningEnvelopes(group) {
+  group.updateMatrixWorld(true);
+  const local = new THREE.Vector3(),
+    world = new THREE.Vector3(),
+    sphere = new THREE.Sphere();
+  let meshes = 0;
+  group.traverse((mesh) => {
+    if (!mesh.isSkinnedMesh) return;
+    meshes++;
+    assert(mesh.frustumCulled, "Skinned citizens must support camera culling");
+    assert(mesh.boundingSphere && Number.isFinite(mesh.boundingSphere.radius));
+    assert(mesh.boundingSphere.radius > 0);
+    sphere.copy(mesh.boundingSphere).applyMatrix4(mesh.matrixWorld);
+    for (let i = 0; i < mesh.geometry.attributes.position.count; i++) {
+      mesh.getVertexPosition(i, local);
+      world.copy(local).applyMatrix4(mesh.matrixWorld);
+      assert(
+        world.distanceToSquared(sphere.center) <= (sphere.radius + 1e-5) ** 2,
+        `${mesh.name} leaves its raycasting/culling envelope`,
+      );
+    }
+  });
+  assert(meshes > 0, "The human must retain its anatomical skinning");
+}
+
+test("animated human bounds contain every skinned vertex while walking, aiming and driving", () => {
+  for (const options of [{}, { civilian: true, index: 4 }]) {
+    const actor = createCharacter(options);
+    try {
+      validateSkinningEnvelopes(actor.group);
+      for (let frame = 0; frame < 180; frame++) {
+        const speed = frame < 30 ? 0 : frame < 70 ? 4 : frame < 130 ? 7 : 0;
+        actor.animate(1 / 60, speed, frame / 60, frame >= 90);
+        if (frame % 12 === 0) validateSkinningEnvelopes(actor.group);
+      }
+      // Culling must use the same parent transform as a scaled, moving car seat.
+      actor.group.position.set(7, -0.53, 19);
+      actor.group.rotation.y = 1.2;
+      actor.group.scale.setScalar(0.9);
+      for (const steering of [-0.7, 0, 0.7]) {
+        actor.setDrivingPose(steering);
+        validateSkinningEnvelopes(actor.group);
+      }
+    } finally {
+      dispose(actor.group);
+    }
+  }
+});
+
+test("rays still hit animated shoes, skin and hair outside their first-pose bounds", () => {
+  const actor = createCharacter();
+  const meshes = ["anatomical-shoes", "anatomical-skin", "anatomical-hair"].map(
+    (name) => actor.group.getObjectByName(name),
+  );
+  const neutral = meshes.map((mesh) => {
+    assert(mesh?.isSkinnedMesh);
+    const envelope = mesh.boundingSphere;
+    mesh.boundingSphere = null;
+    mesh.computeBoundingSphere();
+    const sphere = mesh.boundingSphere.clone();
+    // Prime the old behaviour if the factory loses its conservative envelope.
+    mesh.boundingSphere = envelope || sphere.clone();
+    return sphere;
+  });
+  const points = [
+    new THREE.Vector3(),
+    new THREE.Vector3(),
+    new THREE.Vector3(),
+  ];
+  const center = new THREE.Vector3(),
+    normal = new THREE.Vector3(),
+    edge = new THREE.Vector3(),
+    sphere = new THREE.Sphere(),
+    ray = new THREE.Ray();
+  const directions = [
+    [1, 0, 0],
+    [-1, 0, 0],
+    [0, 1, 0],
+    [0, -1, 0],
+    [0, 0, 1],
+    [0, 0, -1],
+  ].map((value) => new THREE.Vector3(...value));
+  const tested = new Set();
+  try {
+    for (let frame = 0; frame < 180 && tested.size < meshes.length; frame++) {
+      actor.animate(1 / 60, 7, frame / 60, frame > 90);
+      if (frame % 15 !== 0) continue;
+      for (let part = 0; part < meshes.length; part++) {
+        if (tested.has(part)) continue;
+        const mesh = meshes[part],
+          indices = mesh.geometry.index;
+        sphere.copy(neutral[part]).applyMatrix4(mesh.matrixWorld);
+        for (let at = 0; at < indices.count && !tested.has(part); at += 3) {
+          for (let i = 0; i < 3; i++)
+            mesh
+              .getVertexPosition(indices.getX(at + i), points[i])
+              .applyMatrix4(mesh.matrixWorld);
+          center
+            .copy(points[0])
+            .add(points[1])
+            .add(points[2])
+            .multiplyScalar(1 / 3);
+          if (sphere.containsPoint(center)) continue;
+          normal
+            .subVectors(points[1], points[0])
+            .cross(edge.subVectors(points[2], points[0]))
+            .normalize();
+          for (const direction of directions) {
+            if (
+              mesh.material.side === THREE.FrontSide &&
+              direction.dot(normal) > -0.05
+            )
+              continue;
+            ray.origin.copy(center).addScaledVector(direction, -0.06);
+            ray.direction.copy(direction);
+            if (ray.intersectsSphere(sphere)) continue;
+            const raycaster = new THREE.Raycaster(
+              ray.origin,
+              ray.direction,
+              0,
+              0.12,
+            );
+            const hits = raycaster.intersectObject(mesh, false);
+            assert(
+              hits.length > 0,
+              `${mesh.name} is visible at this point but its stale bound rejects the ray`,
+            );
+            tested.add(part);
+            break;
+          }
+        }
+      }
+    }
+    assert.equal(
+      tested.size,
+      meshes.length,
+      "The regression must exercise displaced shoes, skin and hair",
+    );
+  } finally {
+    dispose(actor.group);
+  }
+});

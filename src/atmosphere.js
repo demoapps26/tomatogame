@@ -271,6 +271,8 @@ export function createAtmosphere(
       elapsed: state.elapsed,
     });
     for (const change of changes) {
+      if (change.material.userData?.surfaceWeather)
+        change.material.userData.surfaceWeather.value = state.rain;
       if (change.kind === "road")
         change.material.roughness = THREE.MathUtils.lerp(
           change.roughness,
@@ -525,6 +527,8 @@ export function createAtmosphere(
       change.material.roughness = change.roughness;
       if (change.material.userData?.cityWindow)
         change.material.userData.nightUniform.value = 0;
+      if (change.material.userData?.surfaceWeather)
+        change.material.userData.surfaceWeather.value = 0;
       if (change.emissive) change.material.emissive.copy(change.emissive);
       change.material.emissiveIntensity = change.emissiveIntensity;
     }

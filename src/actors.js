@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { createPhotoTextures, PHOTO_ASSETS } from "./photo-assets.js";
-import { createDetailedCharacter } from "./character-detail.js";
+import { createDetailedHuman } from "./human-asset.js";
 
 const palette = {
   skin: 0xc68f70,
@@ -303,9 +303,9 @@ export function createTomato(radius = 0.16) {
   return group;
 }
 
-/** Tailored human gardener. Ground origin, local +Z forward, approximately 1.80 m tall. */
+/** Anatomical, clothed human gardener. Ground origin, local +Z forward, approximately 1.80 m tall. */
 export function createCharacter(options = {}) {
-  return createDetailedCharacter(options);
+  return createDetailedHuman(options);
 }
 export function createPedestrian(index = 0) {
   return createCharacter({ civilian: true, index });

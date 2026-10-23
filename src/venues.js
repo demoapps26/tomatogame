@@ -123,6 +123,12 @@ export function createVenues({
   document.getElementById("arena").append(work);
   const $ = (id) => panel.querySelector(`#${id}`);
 
+  function groundActor(actor) {
+    const { x, z } = actor.group.position;
+    const height = world.groundHeightAt?.(x, z);
+    actor.group.position.y = Number.isFinite(height) ? height : 0;
+  }
+
   for (const [index, point] of points.entries()) {
     if (!point.actor) continue;
     const actor = createCharacter({ civilian: true, index: index + 2 });
@@ -131,6 +137,7 @@ export function createVenues({
       0,
       Number.isFinite(point.actor.z) ? point.actor.z : point.z,
     );
+    groundActor(actor);
     actor.group.name = `client-${point.id}`;
     const label = makeLabel(point.actor.name || point.label);
     actor.group.add(label);
@@ -298,6 +305,7 @@ export function createVenues({
         }
       }
     for (const { actor, label, point } of actors) {
+      groundActor(actor);
       const distance = Math.hypot(
         actor.group.position.x - playerPosition.x,
         actor.group.position.z - playerPosition.z,

@@ -685,7 +685,8 @@ body[data-state="photo"] #hud,
 body[data-state="photo"] #story-toast {
   display: none !important;
 }
-#open-photo {
+#open-photo,
+#open-jobs {
   position: absolute;
   top: 82px;
   right: 29px;
@@ -703,13 +704,33 @@ body[data-state="photo"] #story-toast {
   border: 1px solid #a8b48c66;
   border-radius: 5px;
 }
+#open-jobs {
+  top: 122px;
+}
+body[data-state="jobs"] #menu,
+body[data-state="jobs"] #touch-controls,
+body[data-state="jobs"] #crosshair,
+body[data-state="jobs"] #prompt,
+body[data-state="jobs"] #story-toast {
+  display: none;
+}
+body[data-state="jobs"] #hud {
+  opacity: 0.34;
+  pointer-events: none;
+}
 @media (max-width: 700px) {
-  #open-photo {
+  #open-photo,
+  #open-jobs {
     top: 69px;
     right: 17px;
     padding: 9px;
   }
+  #open-jobs {
+    top: 111px;
+  }
   #open-photo .photo-label,
+  #open-jobs .jobs-label,
+  #open-jobs kbd,
   #open-photo kbd {
     display: none;
   }

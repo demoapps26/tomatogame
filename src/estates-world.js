@@ -1456,6 +1456,7 @@ export function createEstates(scene, world, quality = "medium") {
     });
     interiorZones.push({
       id: `interior-${site.id}`,
+      floorHeight: 0.08,
       propertyId: site.id,
       minX: site.x - halfW,
       maxX: site.x + halfW,
@@ -1622,6 +1623,7 @@ export function createEstates(scene, world, quality = "medium") {
     }
     interiorZones.push({
       id: "interior-car-dealer",
+      floorHeight: 0.075,
       minX: site.x - 32.5,
       maxX: site.x + 32.5,
       minZ: site.z - 21,

@@ -4,6 +4,8 @@ import { applyPhotographicMaterial } from "./material-library.js";
 import { createVegetationLibrary } from "./vegetation.js";
 import { createCityWindowMaterial } from "./window-material.js";
 import { createUrbanDetail } from "./urban-detail.js";
+import { createTomatoCrops } from "./tomato-crops.js";
+import { createDetailedBuilding } from "./district-asset.js";
 
 export const MAPS = [
   {
@@ -64,12 +66,14 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
     sectorSize = city ? 192 : 128;
   const stats = {
     buildings: 0,
+    detailedBuildings: 0,
     greenhouses: 0,
     areaKm2: Math.round((half * 2) ** 2 / 10000) / 100,
     roadStep,
   };
   let companyPhase = 0,
-    detailLevel = 0;
+    detailLevel = 0,
+    suppressBuilding = false;
   const companyMeshes = [],
     renderBatches = [];
   let companyLevels = [true, false, false, false];
@@ -531,7 +535,114 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
     );
   };
   farFacade.customProgramCacheKey = () => "distant-facade-" + quality;
+  // Record only low, horizontal geometry that a person can stand on. Adjacent
+  // street tiles share an interval group; gaps at road crossings remain gaps.
+  const walkingMaterials = new Set([
+    mats.grass,
+    mats.asphalt,
+    mats.concrete,
+    mats.stone,
+    mats.floor,
+    mats.soil,
+    mats.wood,
+  ]);
+  const walkingGroups = new Map();
+  const walkingBounds = new THREE.Box3();
+  let walkingSurfaceTiles = 0;
+  function registerWalkingSurface(g, m, transform) {
+    if (
+      !walkingMaterials.has(m) ||
+      !(g === boxGeo || g.userData.horizontalGroundSurface)
+    )
+      return;
+    const elements = transform.elements;
+    if (
+      Math.abs(elements[1]) > 1e-8 ||
+      Math.abs(elements[9]) > 1e-8 ||
+      Math.abs(elements[4]) > 1e-8 ||
+      Math.abs(elements[6]) > 1e-8
+    )
+      return;
+    if (!g.boundingBox) g.computeBoundingBox();
+    walkingBounds.copy(g.boundingBox).applyMatrix4(transform);
+    const { min, max } = walkingBounds;
+    if (
+      max.y > 0.3 + 1e-8 ||
+      (!g.userData.horizontalGroundSurface && min.y > 0.15 + 1e-8) ||
+      max.y - min.y > 0.3 + 1e-8 ||
+      max.x - min.x < 0.2 ||
+      max.z - min.z < 0.2
+    )
+      return;
+    const axis = max.x - min.x >= max.z - min.z ? "x" : "z";
+    const minCross = axis === "x" ? min.z : min.x;
+    const maxCross = axis === "x" ? max.z : max.x;
+    const minAlong = axis === "x" ? min.x : min.z;
+    const maxAlong = axis === "x" ? max.x : max.z;
+    const key = `${companyPhase}:${max.y.toFixed(6)}:${axis}:${minCross.toFixed(6)}:${maxCross.toFixed(6)}`;
+    if (!walkingGroups.has(key))
+      walkingGroups.set(key, {
+        phase: companyPhase,
+        height: max.y,
+        axis,
+        minCross,
+        maxCross,
+        intervals: [],
+      });
+    walkingGroups.get(key).intervals.push([minAlong, maxAlong]);
+    walkingSurfaceTiles++;
+  }
+  function finalizeWalkingSurfaces() {
+    for (const surface of walkingGroups.values()) {
+      surface.intervals.sort((a, b) => a[0] - b[0]);
+      const merged = [];
+      for (const interval of surface.intervals) {
+        const previous = merged.at(-1);
+        if (previous && interval[0] <= previous[1] + 1e-7)
+          previous[1] = Math.max(previous[1], interval[1]);
+        else merged.push(interval);
+      }
+      surface.intervals = merged;
+    }
+    stats.walkingSurfaceGroups = walkingGroups.size;
+    stats.walkingSurfaceTiles = walkingSurfaceTiles;
+  }
+  function groundHeightAt(x, z) {
+    let height = -0.035;
+    if (!Number.isFinite(x) || !Number.isFinite(z)) return height;
+    for (const surface of walkingGroups.values()) {
+      if (
+        surface.height <= height ||
+        (surface.phase && !companyLevels[surface.phase])
+      )
+        continue;
+      const cross = surface.axis === "x" ? z : x;
+      if (cross < surface.minCross || cross > surface.maxCross) continue;
+      const along = surface.axis === "x" ? x : z;
+      if (
+        surface.intervals.some(
+          (interval) => along >= interval[0] && along <= interval[1],
+        )
+      )
+        height = surface.height;
+    }
+    // Estates append their floor metadata to this same array after buildWorld.
+    for (const zone of interiorZones) {
+      if (
+        Number.isFinite(zone.floorHeight) &&
+        x >= zone.minX &&
+        x <= zone.maxX &&
+        z >= zone.minZ &&
+        z <= zone.maxZ &&
+        (!zone.companyPhase || companyLevels[zone.companyPhase])
+      )
+        height = Math.max(height, zone.floorHeight);
+    }
+    return height;
+  }
   function append(g, m, matrix, x, z, color) {
+    if (suppressBuilding) return;
+    registerWalkingSurface(g, m, matrix);
     const chunk = detailLevel
       ? `${Math.floor(x / (detailLevel === 1 ? 96 : sectorSize))}:${Math.floor(z / (detailLevel === 1 ? 96 : sectorSize))}`
       : "global";
@@ -541,6 +652,15 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
     batches.get(key).items.push({ matrix: matrix.clone(), color });
   }
   const vegetation = createVegetationLibrary({
+    quality,
+    append(g, m, transform, x, z, color, level = 0) {
+      const previous = detailLevel;
+      detailLevel = level;
+      append(g, m, transform, x, z, color);
+      detailLevel = previous;
+    },
+  });
+  const crops = createTomatoCrops({
     quality,
     append(g, m, transform, x, z, color, level = 0) {
       const previous = detailLevel;
@@ -614,6 +734,7 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
     if (planeCache.has(key)) return planeCache.get(key);
     const g = geometry(new THREE.PlaneGeometry(width, depth));
     g.rotateX(-Math.PI / 2);
+    g.userData.horizontalGroundSurface = true;
     const uv = g.attributes.uv;
     for (let i = 0; i < uv.count; i++)
       uv.setXY(i, (uv.getX(i) * width) / tile, (uv.getY(i) * depth) / tile);
@@ -719,8 +840,7 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
     box(mats.concrete, x, 0.35, z, width, 0.7, depth);
     box(mats.soil, x, 0.72, z, width - 0.22, 0.08, depth - 0.22);
     for (let p = -width / 2 + 0.5; p < width / 2; p += 0.65)
-      orb(
-        mats.leaf,
+      crops.addPlanterShrub(
         x + p,
         1,
         z,
@@ -746,73 +866,7 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
     collision(x, z, 1.12, 0.9, stack);
   }
   function crop(x, z, size = 1) {
-    cyl(mats.wood, x, 1.2 * size, z, 0.035, 2.4 * size);
-    // Visible stems, broken leaf silhouettes and fruit along a trellis.
-    beam(
-      mats.leaf,
-      x,
-      0.7 * size,
-      z,
-      x + 0.1 * size,
-      2.2 * size,
-      z - 0.05 * size,
-      0.026 * size,
-    );
-    for (const side of [-1, 1]) {
-      beam(
-        mats.leaf,
-        x,
-        1.2 * size,
-        z,
-        x + side * 0.38 * size,
-        1.55 * size,
-        z + 0.12 * size,
-        0.018 * size,
-      );
-      beam(
-        mats.leaf,
-        x + 0.1 * size,
-        1.7 * size,
-        z,
-        x + side * 0.33 * size,
-        2 * size,
-        z - 0.15 * size,
-        0.014 * size,
-      );
-    }
-    for (const yaw of [0, Math.PI / 3, (Math.PI * 2) / 3])
-      instance(
-        leafCardGeo,
-        mats.foliage,
-        x,
-        1.5 * size,
-        z,
-        1.28 * size,
-        2.08 * size,
-        1,
-        yaw,
-        "#66864d",
-      );
-    instance(
-      sphereGeo,
-      mats.tomato,
-      x - 0.29 * size,
-      1.15 * size,
-      z + 0.2 * size,
-      0.05 * size,
-      0.046 * size,
-      0.05 * size,
-    );
-    instance(
-      sphereGeo,
-      mats.tomato,
-      x + 0.25 * size,
-      1.52 * size,
-      z + 0.18 * size,
-      0.058 * size,
-      0.052 * size,
-      0.058 * size,
-    );
+    crops.addCrop(x, z, size);
   }
   function building(
     x,
@@ -838,7 +892,69 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
             ? ["#c8c9bb", "#acb9b1", "#c5b79d"]
             : ["#f3e6cc", "#e0cfb4", "#d9d8c2", "#e6d6bb", "#d8c3aa"],
       );
-    buildingSites.push({ x, z, width, depth, height, style, color, label });
+    // Preserve procedural RNG calls below, so routes, yards and saved positions
+    // remain stable. Only the four replaced buildings suppress their old batches.
+    const detailedSites = {
+      "-28:68": { variant: "cafe", yaw: 2.042 },
+      "-68:68": { variant: "cafe", yaw: 0.471 },
+      "-28:28": { variant: "townhouse", yaw: 3.613 },
+      "-68:28": { variant: "townhouse", yaw: 0.471 },
+    };
+    const specification =
+      city && !low && !label ? detailedSites[`${x}:${z}`] : null;
+    let detailedBounds = null;
+    const previousSuppression = suppressBuilding;
+    if (specification) {
+      const asset = createDetailedBuilding(specification);
+      // The source district has oblique axes. Orient the actual facades to
+      // the street, then measure their rotated geometry rather than swapping
+      // unrotated dimensions. Keep native metre scale and centre the fitted lot.
+      asset.rotation.y = specification.yaw;
+      const orientedBox = new THREE.Box3().setFromObject(asset, true);
+      const extent = orientedBox.getSize(new THREE.Vector3());
+      const centre = orientedBox.getCenter(new THREE.Vector3());
+      const scale = Math.min(
+        1,
+        (width - 0.12) / extent.x,
+        (depth - 0.12) / extent.z,
+      );
+      asset.scale.setScalar(scale);
+      asset.position.set(
+        x - centre.x * scale,
+        0.015 - orientedBox.min.y * scale,
+        z - centre.z * scale,
+      );
+      asset.name = `detailed-${specification.variant}-${x}-${z}`;
+      asset.traverse((object) => {
+        if (object.geometry) geometries.add(object.geometry);
+        for (const material of object.material
+          ? [object.material].flat()
+          : []) {
+          materials.add(material);
+          for (const value of Object.values(material))
+            if (value?.isTexture) textures.add(value);
+        }
+      });
+      group.add(asset);
+      detailedBounds = {
+        width: extent.x * scale,
+        depth: extent.z * scale,
+        height: extent.y * scale,
+      };
+      stats.detailedBuildings++;
+      suppressBuilding = true;
+    }
+    buildingSites.push({
+      x,
+      z,
+      width,
+      depth,
+      height,
+      style,
+      color,
+      label,
+      ...(detailedBounds ? { ...detailedBounds, detailedAsset: true } : {}),
+    });
     box(main, x, height / 2, z, width, height, depth, 0, color);
     for (const side of [-1, 1]) {
       instance(
@@ -1206,7 +1322,14 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
         "#344d41",
         "#eee4ca",
       );
-    collision(x, z, width + 0.12, depth + 0.12, height + 2);
+    suppressBuilding = previousSuppression;
+    collision(
+      x,
+      z,
+      detailedBounds ? detailedBounds.width : width + 0.12,
+      detailedBounds ? detailedBounds.depth : depth + 0.12,
+      detailedBounds ? detailedBounds.height : height + 2,
+    );
   }
   function greenhouse(x, z, width = 24, length = 38, withPlants = true) {
     stats.greenhouses++;
@@ -2842,6 +2965,7 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
   group.add(urbanDetail.group);
   urbanDetail.update(0.31, renderFocus);
   let previousDetailTime = 0;
+  finalizeWalkingSurfaces();
   const allColliders = colliders.slice();
   let companyLayout = "";
   function updateCompany(company = {}) {
@@ -2941,6 +3065,7 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
       );
     mats.water.normalMap.offset.set(elapsed * 0.006, elapsed * 0.003);
     vegetation.update(elapsed);
+    crops.update(elapsed);
     urbanDetail.update(
       Math.max(0, Math.min(0.5, elapsed - previousDetailTime)),
       renderFocus,
@@ -3071,9 +3196,11 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
     pedestrianRoutes,
     stats,
     vegetationStats: vegetation.stats,
+    cropStats: crops.stats,
     urbanStats: urbanDetail.stats,
     roadStep,
     updateCompany,
+    groundHeightAt,
     navigationCellSize: city ? 6 : 4,
     spawn: new THREE.Vector3(0, 0, 86),
     vehicleSpawns: city
@@ -3118,6 +3245,7 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
       group.removeFromParent();
       urbanDetail.dispose();
       vegetation.dispose();
+      crops.dispose();
       for (const g of geometries) g.dispose();
       for (const m of materials) m.dispose();
       for (const t of textures) t.dispose();

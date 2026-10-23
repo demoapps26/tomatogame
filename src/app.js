@@ -21,7 +21,11 @@ import { createDrivingCamera } from "./driving-camera.js";
 import { createFleet } from "./fleet.js";
 import { createVenues } from "./venues.js";
 import { photoAssetsReady, getPhotoAssetState } from "./photo-assets.js";
-import { scannedHeadsReady, getScannedHeadState } from "./scanned-head.js";
+import { humanAssetsReady, getHumanAssetState } from "./human-asset.js";
+import {
+  districtAssetsReady,
+  getDistrictAssetState,
+} from "./district-asset.js";
 import {
   CAR_CATALOG,
   getOwnershipView,
@@ -52,6 +56,20 @@ import {
 } from "./furniture-asset.js";
 import { createVehicleReflections } from "./vehicle-reflections.js";
 import { cameraBoomPosition } from "./camera-obstruction.js";
+import { advanceDriving } from "./driving-physics.js";
+import {
+  FIELD_JOBS,
+  FIELD_JOBS_BOARD,
+  createFieldJobs,
+  normalizeFieldJobs,
+  getFieldJobsView,
+  startFieldJob,
+  interactFieldJob,
+  advanceFieldJobs,
+  cancelFieldJob,
+  canInteractFieldJob,
+} from "./field-jobs.js";
+import { createFieldJobsPanel } from "./field-jobs-panel.js";
 import { createPhotoMode } from "./photo-mode.js";
 
 const $ = (id) => document.getElementById(id);
@@ -128,9 +146,13 @@ let activeContractId = savedCampaign?.activeContractId || null,
   ownershipPanel = null,
   cityMapPanel = null,
   photoMode = null,
+  fieldJobsPanel = null,
+  fieldBoard = null,
+  fieldBoardColliders = [],
   atmosphere = null,
   raceCourse = null;
 let trials = normalizeTrials(savedCampaign?.trials);
+let fieldJobs = normalizeFieldJobs(savedCampaign?.fieldJobs);
 let atmosphereState = savedCampaign?.atmosphere || null;
 let vehicleUsageTime = 0;
 const drivingCamera = createDrivingCamera();
@@ -399,10 +421,14 @@ function safePosition(x, z) {
     }
   return new THREE.Vector3(world.spawn.x, 0, world.spawn.z);
 }
+function placeCharacter(actor, point) {
+  actor.group.position.copy(point);
+  actor.group.position.y = world?.groundHeightAt?.(point.x, point.z) ?? 0;
+}
 function addEnemy(position, index = 0) {
   const actor = createCharacter({ enemy: true }),
     point = safePosition(position.x, position.z);
-  actor.group.position.copy(point);
+  placeCharacter(actor, point);
   scene.add(actor.group);
   enemies.push({
     actor,
@@ -415,6 +441,187 @@ function addEnemy(position, index = 0) {
     path: [],
     navTime: 0,
   });
+}
+function fieldContext() {
+  return {
+    mapId,
+    founded,
+    position: player.position,
+    driving: !!player.vehicle,
+  };
+}
+function spawnFieldRivals(point) {
+  if (enemies.some((enemy) => enemy.missionRival)) return;
+  for (const [dx, dz] of [
+    [-8, -12],
+    [10, -9],
+    [7, 12],
+  ]) {
+    addEnemy({ x: point.x + dx, z: point.z + dz }, enemies.length);
+    enemies.at(-1).missionRival = true;
+  }
+}
+function applyFieldJobResult(result, persist = true) {
+  if (!result?.ok) {
+    if (result?.message) notify(result.message);
+    return result;
+  }
+  fieldJobs = result.state;
+  if (result.reward > 0) {
+    company = {
+      ...company,
+      cash: company.cash + result.reward,
+      history: [
+        ...company.history,
+        {
+          day: company.day,
+          kind: "field-job",
+          title: "Trabalho da quinta",
+          body: result.message,
+        },
+      ].slice(-100),
+    };
+    companyView = getCompanyView(company);
+    sound("reward");
+  }
+  for (const event of result.events || []) {
+    if (event.type === "ambush") spawnFieldRivals(event.point);
+    if (event.type === "completed" || event.type === "failed") {
+      for (const enemy of enemies.filter((item) => item.missionRival))
+        clearGroup(enemy.actor.group);
+      enemies = enemies.filter((item) => !item.missionRival);
+    }
+  }
+  if (result.events?.length) {
+    route = [];
+    routeTime = 0;
+    if (result.message) notify(result.message, 7);
+    updateMission();
+    updateHud();
+    fieldJobsPanel?.refresh();
+  }
+  if (persist || result.events?.length) saveCampaign();
+  return result;
+}
+function createFieldBoard() {
+  const group = new THREE.Group();
+  group.name = "farm-job-board";
+  const frame = new THREE.MeshStandardMaterial({
+    color: 0x4b4235,
+    roughness: 0.83,
+  });
+  const box = new THREE.BoxGeometry(1, 1, 1);
+  for (const x of [11.6, 13.0]) {
+    const post = new THREE.Mesh(box, frame);
+    post.position.set(x, 1.05, 81.4);
+    post.scale.set(0.075, 2.1, 0.075);
+    post.castShadow = true;
+    group.add(post);
+  }
+  const board = new THREE.Mesh(box, frame);
+  board.position.set(12.3, 1.65, 81.4);
+  board.scale.set(1.8, 1.1, 0.14);
+  board.castShadow = true;
+  group.add(board);
+  const label = document.createElement("canvas");
+  label.width = 1024;
+  label.height = 640;
+  const ctx = label.getContext("2d");
+  ctx.fillStyle = "#ece3c9";
+  ctx.fillRect(0, 0, 1024, 640);
+  ctx.fillStyle = "#2f4b37";
+  ctx.fillRect(0, 0, 1024, 130);
+  ctx.fillStyle = "#f5eed7";
+  ctx.font = "bold 56px sans-serif";
+  ctx.fillText("TRABALHOS DA QUINTA", 42, 85);
+  ctx.fillStyle = "#374334";
+  ctx.font = "35px sans-serif";
+  [
+    "01   A primeira ronda",
+    "02   O lote desaparecido",
+    "03   Selo de origem",
+  ].forEach((text, i) => ctx.fillText(text, 54, 225 + i * 95));
+  ctx.font = "32px sans-serif";
+  ctx.fillText("E / J · Abrir o caderno", 54, 565);
+  const texture = new THREE.CanvasTexture(label);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const paper = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.7, 1.0),
+    new THREE.MeshStandardMaterial({ map: texture, roughness: 0.95 }),
+  );
+  paper.position.set(12.3, 1.65, 81.48);
+  group.add(paper);
+  const boardCollider = {
+    minX: 11.4,
+    maxX: 13.2,
+    minZ: 81.28,
+    maxZ: 81.52,
+    minY: 0,
+    maxY: 2.2,
+    fieldBoardCollider: true,
+  };
+  fieldBoardColliders = [boardCollider];
+  // The recovery job has a visible, solid cache bearing the old farm's stamp.
+  const crateMaterial = new THREE.MeshStandardMaterial({
+    color: 0x9f805a,
+    roughness: 0.89,
+  });
+  const strapMaterial = new THREE.MeshStandardMaterial({
+    color: 0x4d5441,
+    roughness: 0.77,
+  });
+  for (const [x, z, count] of [
+    [281.5, 401.5, 2],
+    [282.8, 401.5, 1],
+  ]) {
+    for (let level = 0; level < count; level++) {
+      const crate = new THREE.Mesh(box, crateMaterial);
+      crate.position.set(x, 0.45 + level * 0.9, z);
+      crate.scale.set(1.1, 0.9, 0.85);
+      crate.castShadow = crate.receiveShadow = true;
+      group.add(crate);
+      for (const side of [-1, 1]) {
+        const strap = new THREE.Mesh(box, strapMaterial);
+        strap.position.set(x + side * 0.38, 0.45 + level * 0.9, z - 0.432);
+        strap.scale.set(0.055, 0.9, 0.02);
+        group.add(strap);
+      }
+    }
+    fieldBoardColliders.push({
+      minX: x - 0.55,
+      maxX: x + 0.55,
+      minZ: z - 0.425,
+      maxZ: z + 0.425,
+      minY: 0,
+      maxY: count * 0.9,
+      fieldBoardCollider: true,
+    });
+  }
+  const stamp = document.createElement("canvas");
+  stamp.width = 512;
+  stamp.height = 256;
+  const stampContext = stamp.getContext("2d");
+  stampContext.fillStyle = "#b5976d";
+  stampContext.fillRect(0, 0, 512, 256);
+  stampContext.fillStyle = "#3e4833";
+  stampContext.textAlign = "center";
+  stampContext.font = "bold 47px sans-serif";
+  stampContext.fillText("QUINTA ANSELMO", 256, 100);
+  stampContext.font = "31px sans-serif";
+  stampContext.fillText("SANTA TOMATA · LOTE 01", 256, 165);
+  const stampTexture = new THREE.CanvasTexture(stamp);
+  stampTexture.colorSpace = THREE.SRGBColorSpace;
+  const stampMesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.78, 0.4),
+    new THREE.MeshStandardMaterial({ map: stampTexture, roughness: 0.95 }),
+  );
+  stampMesh.position.set(281.5, 0.55, 401.066);
+  stampMesh.rotation.y = Math.PI;
+  group.add(stampMesh);
+  world.colliders.push(...fieldBoardColliders);
+  world.interactionPoints.push({ ...FIELD_JOBS_BOARD });
+  scene.add(group);
+  fieldBoard = group;
 }
 function currentContract() {
   return (
@@ -432,6 +639,8 @@ function businessLocation(id) {
   );
 }
 function questPoint() {
+  const field = getFieldJobsView(fieldJobs).active;
+  if (field && mapId === "cidade") return field.point;
   const trial =
     trials.active && mapId === "cidade" ? getTrialsView(trials).active : null;
   if (trial?.nextCheckpoint) return trial.nextCheckpoint;
@@ -491,6 +700,7 @@ function campaignSnapshot() {
     lastStoryEvent,
     atmosphere: atmosphere?.getState() || atmosphereState,
     trials,
+    fieldJobs,
     vehicles: cars.map((car) => ({
       x: car.position.x,
       z: car.position.z,
@@ -521,9 +731,14 @@ function updateWorldLayout() {
   if (!world) return false;
   // The base world mutates this same collider array when company buildings change.
   for (let i = world.colliders.length - 1; i >= 0; i--)
-    if (world.colliders[i].estateCollider) world.colliders.splice(i, 1);
+    if (
+      world.colliders[i].estateCollider ||
+      world.colliders[i].fieldBoardCollider
+    )
+      world.colliders.splice(i, 1);
   const changed = world.updateCompany?.(company);
   const estateChanged = estates?.updateOwnership(company);
+  world.colliders.push(...fieldBoardColliders);
   for (const box of estates?.colliders || []) {
     box.estateCollider = true;
     world.colliders.push(box);
@@ -616,7 +831,7 @@ function equipOwnedCar(id) {
   car.position.set(bay.x, 0, bay.z);
   car.yaw = bay.yaw || 0;
   car.actor.group.rotation.y = car.yaw;
-  car.speed = car.steering = 0;
+  car.speed = car.steering = car.lateralSpeed = 0;
   player.vehicle = car;
   player.position.copy(car.position);
   player.actor.group.visible = false;
@@ -648,6 +863,12 @@ function nearestOwnershipPoint() {
   return closest;
 }
 function beginTrial(id) {
+  if (fieldJobs.active)
+    return {
+      ok: false,
+      message:
+        "Termina ou cancela o trabalho da quinta antes de iniciar um percurso.",
+    };
   const result = startTrial(trials, id, {
     position: player.position,
     driving: !!player.vehicle,
@@ -718,6 +939,12 @@ function closeCompany() {
   saveCampaign();
 }
 function trackContract(id) {
+  if (fieldJobs.active) {
+    notify(
+      "Termina ou cancela o trabalho da quinta em J antes de seguir um contrato.",
+    );
+    return;
+  }
   const contract = company.contracts?.find(
     (item) =>
       item.id === id &&
@@ -803,6 +1030,8 @@ function resetMap(id) {
   if (world) flushVehicleUsage(true);
   if (atmosphere) atmosphereState = atmosphere.getState();
   if (initialized && trials.active) trials = cancelTrial(trials).state;
+  if (initialized && fieldJobs.active && id !== "cidade")
+    applyFieldJobResult(cancelFieldJob(fieldJobs));
   transitioning = true;
   renderDirty = true;
   for (const shot of shots) shot.mesh.removeFromParent();
@@ -816,6 +1045,11 @@ function resetMap(id) {
   for (const car of cars) clearGroup(car.actor.group);
   cars = [];
   if (marker) clearGroup(marker);
+  if (fieldBoard) {
+    clearGroup(fieldBoard);
+    fieldBoard = null;
+  }
+  fieldBoardColliders = [];
   life?.dispose();
   life = null;
   fleet?.dispose();
@@ -837,6 +1071,7 @@ function resetMap(id) {
     world.interactionPoints.push(...estates.interactionPoints);
     world.interiorZones.push(...estates.interiorZones);
     updateWorldLayout();
+    createFieldBoard();
     raceCourse = createRaceCourse(scene, world, () => trials);
     world.interactionPoints.push(...raceCourse.startPoints);
   }
@@ -858,7 +1093,7 @@ function resetMap(id) {
   player.vehicle = null;
   player.yaw = Math.PI;
   player.actor.group.visible = true;
-  player.actor.group.position.copy(player.position);
+  placeCharacter(player.actor, player.position);
   player.actor.group.rotation.y = player.yaw;
   yaw = 0;
   pitch = 0.24;
@@ -893,6 +1128,12 @@ function resetMap(id) {
   world.enemySpawns
     .slice(0, 6)
     .forEach((spawn, index) => addEnemy(spawn, index));
+  if (mapId === "cidade" && fieldJobs.active?.ambushTriggered) {
+    const ambush = FIELD_JOBS.find(
+      (job) => job.id === fieldJobs.active.jobId,
+    )?.steps.find((step) => step.event === "ambush");
+    if (ambush) spawnFieldRivals(ambush.point);
+  }
   life = createCityLife(scene, world, settings.quality);
   if (mapId === "cidade") {
     fleet = createFleet(scene, world, settings.quality);
@@ -939,6 +1180,14 @@ function resetMap(id) {
   transitioning = false;
 }
 function updateMission() {
+  const field = getFieldJobsView(fieldJobs).active;
+  if (field && mapId === "cidade") {
+    $("mission-title").textContent = field.title;
+    $("mission-description").textContent = field.description;
+    $("mission-progress").textContent =
+      `${Math.ceil(field.remaining)} s · ETAPA ${field.stepIndex + 1}/${field.stepCount} · J TRABALHOS`;
+    return;
+  }
   const trial =
     trials.active && mapId === "cidade" ? getTrialsView(trials).active : null;
   if (trial) {
@@ -1017,6 +1266,22 @@ function missionAction() {
 }
 function interact() {
   if (state !== "playing") return;
+  if (canInteractFieldJob(fieldJobs, fieldContext())) {
+    applyFieldJobResult(interactFieldJob(fieldJobs, fieldContext()));
+    return;
+  }
+  if (
+    !fieldJobs.active &&
+    mapId === "cidade" &&
+    !player.vehicle &&
+    Math.hypot(
+      player.position.x - FIELD_JOBS_BOARD.x,
+      player.position.z - FIELD_JOBS_BOARD.z,
+    ) <= 3
+  ) {
+    fieldJobsPanel?.open();
+    return;
+  }
   if (currentContract() && mapId === "cidade" && missionAction()) return;
   const ownershipPoint = nearestOwnershipPoint();
   if (ownershipPoint && ownershipPanel?.interact(ownershipPoint)) return;
@@ -1045,6 +1310,7 @@ function interact() {
     }
     player.position.copy(exit);
     car.speed = 0;
+    car.lateralSpeed = 0;
     player.vehicle = null;
     player.actor.group.visible = true;
     notify("A pé. Rato para mirar; clique para arremessar.");
@@ -1055,6 +1321,7 @@ function interact() {
     if (car) {
       player.vehicle = car;
       car.speed = 0;
+      car.lateralSpeed = 0;
       player.actor.group.visible = false;
       player.position.copy(car.position);
       yaw = car.yaw - Math.PI;
@@ -1062,6 +1329,7 @@ function interact() {
       notify("W acelera · S trava/recua · A/D vira · Espaço trava · E sai.", 5);
     }
   }
+  if (!player.vehicle) placeCharacter(player.actor, player.position);
   updateHud();
   saveCampaign();
 }
@@ -1095,9 +1363,14 @@ function setState(next) {
   state = next;
   renderDirty = true;
   document.body.dataset.state = next;
-  $("hud").inert = ["company", "venue", "ownership", "map", "photo"].includes(
-    next,
-  );
+  $("hud").inert = [
+    "company",
+    "venue",
+    "ownership",
+    "map",
+    "photo",
+    "jobs",
+  ].includes(next);
   atmosphere?.setActive(next === "playing");
   keys.clear();
   fireHeld = false;
@@ -1115,6 +1388,7 @@ function setState(next) {
   if (next !== "venue" && venues?.isOpen()) venues.close();
   if (next !== "ownership" && ownershipPanel?.isOpen()) ownershipPanel.close();
   if (next !== "map" && cityMapPanel?.isOpen()) cityMapPanel.close();
+  if (next !== "jobs" && fieldJobsPanel?.isOpen()) fieldJobsPanel.close();
   if (audio.motorGain)
     audio.motorGain.gain.setTargetAtTime(0, audio.context.currentTime, 0.05);
 }
@@ -1185,7 +1459,13 @@ function shoot() {
     : raycaster.ray.at(90, new THREE.Vector3());
   const origin = player.position
     .clone()
-    .add(new THREE.Vector3(0, player.vehicle ? 2 : 1.45, 0));
+    .add(
+      new THREE.Vector3(
+        0,
+        player.vehicle ? 2 : 1.45 + player.actor.group.position.y,
+        0,
+      ),
+    );
   const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
   origin.addScaledVector(right, 0.32);
   const direction = aim.clone().sub(origin).normalize();
@@ -1233,6 +1513,14 @@ function damage(amount) {
   sound("hit");
   updateHud();
   if (player.health <= 0) {
+    if (fieldJobs.active)
+      applyFieldJobResult(
+        advanceFieldJobs(fieldJobs, {
+          ...fieldContext(),
+          dt: 0.001,
+          health: 0,
+        }),
+      );
     const fee = Math.min(company.cash, 50);
     company = {
       ...company,
@@ -1250,7 +1538,7 @@ function damage(amount) {
     };
     companyView = getCompanyView(company);
     save();
-    if (player.vehicle) player.vehicle.speed = 0;
+    if (player.vehicle) player.vehicle.speed = player.vehicle.lateralSpeed = 0;
     player.vehicle = null;
     const home =
       mapId === "cidade" &&
@@ -1265,7 +1553,7 @@ function damage(amount) {
     player.health = 100;
     player.ammo = 12;
     player.actor.group.visible = true;
-    player.actor.group.position.copy(player.position);
+    placeCharacter(player.actor, player.position);
     wanted = 0;
     reloadTime = 0;
     shots.forEach((s) => s.mesh.removeFromParent());
@@ -1295,6 +1583,11 @@ function updateHud() {
   $("vehicle-hud").hidden = !player.vehicle;
   if (player.vehicle) {
     $("speed").textContent = Math.round(Math.abs(player.vehicle.speed) * 3.6);
+    if ($("vehicle-gear")) {
+      const gear = player.vehicle.gear || 0;
+      $("vehicle-gear").textContent =
+        gear < 0 ? "R" : gear === 0 ? "N" : `${gear}ª`;
+    }
     const record = company.ownership.vehicles.find(
       (item) => item.id === player.vehicle.ownershipId,
     );
@@ -1340,45 +1633,52 @@ function updatePlayer(dt) {
       record = company.ownership.vehicles.find(
         (item) => item.id === car.ownershipId,
       ),
-      model = record && CAR_CATALOG.find((item) => item.id === record.modelId),
+      model = CAR_CATALOG.find(
+        (item) => item.id === (record?.modelId || car.modelId),
+      ),
       canDrive = !record || (record.fuel > 0 && record.condition > 0),
-      gas = canDrive
-        ? (keys.has("w") || keys.has("arrowup") ? 1 : 0) -
-          (keys.has("s") || keys.has("arrowdown") ? 1 : 0)
-        : 0;
+      gas =
+        (keys.has("w") || keys.has("arrowup") ? 1 : 0) -
+        (keys.has("s") || keys.has("arrowdown") ? 1 : 0);
     const turn =
       (keys.has("a") || keys.has("arrowleft") ? 1 : 0) -
       (keys.has("d") || keys.has("arrowright") ? 1 : 0);
     const conditionFactor = record ? 0.55 + (0.45 * record.condition) / 100 : 1;
-    car.speed +=
-      gas *
-      dt *
-      (gas * car.speed < 0
-        ? model?.braking || 22
-        : (model?.acceleration || 11) * conditionFactor);
-    car.speed = THREE.MathUtils.clamp(
-      car.speed,
-      -7,
-      (model?.topSpeed || 23) * conditionFactor,
-    );
-    car.speed *= Math.exp(-dt * (keys.has(" ") ? 4.2 : gas ? 0.18 : 1.0));
-    if (Math.abs(car.speed) < 0.04) car.speed = 0;
-    car.steering = THREE.MathUtils.damp(car.steering, turn * 0.5, 8, dt);
     const previousYaw = car.yaw;
-    car.yaw +=
-      car.steering *
-      dt *
-      car.speed *
-      0.14 *
-      (model?.handling ? model.handling / 0.85 : 1);
+    const motion = advanceDriving(
+      car,
+      {
+        throttle: gas,
+        turn,
+        brake: keys.has(" "),
+        canDrive,
+        wetness: atmosphere?.getState().rain || 0,
+      },
+      {
+        ...model,
+        acceleration: (model?.acceleration || 11) * conditionFactor,
+        topSpeed: (model?.topSpeed || 23) * conditionFactor,
+      },
+      dt,
+    );
+    Object.assign(car, {
+      speed: motion.speed,
+      steering: motion.steering,
+      yaw: motion.yaw,
+      lateralSpeed: motion.lateralSpeed,
+      gear: motion.gear,
+      rpm: motion.rpm,
+      braking: motion.braking,
+    });
     if (occupiedAt(car, car.position.x, car.position.z, 1.2))
       car.yaw = previousYaw;
+    const headingDelta = car.yaw - motion.yaw;
     const previousX = car.position.x,
       previousZ = car.position.z;
     const blocked = moveTo(
       car,
-      Math.sin(car.yaw) * car.speed * dt,
-      Math.cos(car.yaw) * car.speed * dt,
+      motion.dx * Math.cos(headingDelta) + motion.dz * Math.sin(headingDelta),
+      motion.dz * Math.cos(headingDelta) - motion.dx * Math.sin(headingDelta),
       Math.max(1.2, (car.bounds?.width || 2.3) / 2),
     );
     if (car.ownershipId)
@@ -1391,6 +1691,7 @@ function updatePlayer(dt) {
         car.pendingDamage += Math.min(12, Math.abs(car.speed) * 0.4);
       if (Math.abs(car.speed) > 8 && damage(4)) return;
       car.speed *= -0.18;
+      car.lateralSpeed = 0;
     }
     car.actor.group.rotation.y = car.yaw;
     car.actor.animate(dt, car.speed, car.steering);
@@ -1430,7 +1731,7 @@ function updatePlayer(dt) {
           ),
         Math.min(1, dt * 13),
       );
-    player.actor.group.position.copy(player.position);
+    placeCharacter(player.actor, player.position);
     player.actor.group.rotation.y = player.yaw;
     player.actor.animate(
       dt,
@@ -1468,7 +1769,10 @@ function updateEnemies(dt) {
       distance = delta.length(),
       visible = distance < 35 && lineClear(enemy.position, player.position);
     let speed = 0;
-    const alerted = wanted > 0.7 || (mapId !== "cidade" && distance < 14);
+    const alerted =
+      enemy.missionRival ||
+      wanted > 0.7 ||
+      (mapId !== "cidade" && distance < 14);
     if (alerted && distance < 55 && (distance > 9 || !visible)) {
       enemy.navTime -= dt;
       if (!visible && enemy.navTime <= 0) {
@@ -1504,6 +1808,7 @@ function updateEnemies(dt) {
       speed = 0.65;
     }
     enemy.actor.group.rotation.y = Math.atan2(delta.x, delta.z);
+    placeCharacter(enemy.actor, enemy.position);
     enemy.actor.animate(dt, speed, time, visible);
     enemy.attack -= dt;
     if (alerted && visible && enemy.attack <= 0) {
@@ -1658,13 +1963,42 @@ function updateQuests(dt) {
     )
   )
     prompt = `E · ${service.label}`;
+  const field = getFieldJobsView(fieldJobs).active;
+  if (
+    mapId === "cidade" &&
+    field &&
+    Math.hypot(
+      player.position.x - field.point.x,
+      player.position.z - field.point.z,
+    ) <= 5
+  ) {
+    prompt =
+      field.requiresVehicle && !player.vehicle
+        ? "Entra numa viatura para entregar o lote"
+        : field.requiresOnFoot && player.vehicle
+          ? "E · Sair da viatura para continuar o trabalho"
+          : `E · ${field.stepTitle}`;
+  } else if (
+    mapId === "cidade" &&
+    !field &&
+    !player.vehicle &&
+    Math.hypot(
+      player.position.x - FIELD_JOBS_BOARD.x,
+      player.position.z - FIELD_JOBS_BOARD.z,
+    ) <= 4
+  )
+    prompt = "E · Trabalhos da quinta · J consultar";
   $("prompt").textContent = prompt;
   $("prompt").hidden = !prompt;
   routeTime -= dt;
   if (remoteContract || trials.active) {
     route = [];
     routeTime = 0;
-  } else if ((contract || placeTargetId) && point && routeTime <= 0) {
+  } else if (
+    (contract || placeTargetId || fieldJobs.active) &&
+    point &&
+    routeTime <= 0
+  ) {
     route = navigation.findPath(player.position, point);
     routeTime = 5;
   }
@@ -1708,8 +2042,8 @@ function cameraUpdate(dt, instant = false) {
     );
   lookTarget.copy(player.position);
   lookTarget.y = chase?.height || 1.35;
-  const distance = chase?.distance || (indoors ? 3.2 : 5.4),
-    shoulder = player.vehicle ? 0.12 : indoors ? 0.3 : 0.65;
+  const distance = chase?.distance || (indoors ? 3.2 : 4.6),
+    shoulder = player.vehicle ? 0.12 : indoors ? 0.3 : 0.55;
   cameraDesired.set(
     player.position.x +
       Math.sin(yaw) * Math.cos(pitch) * distance +
@@ -1878,6 +2212,14 @@ function update(dt) {
   if (fireHeld) shoot();
   updatePlayer(dt);
   updateVehicleDrivers();
+  if (fieldJobs.active) {
+    const fieldResult = advanceFieldJobs(fieldJobs, {
+      ...fieldContext(),
+      dt,
+      health: player.health,
+    });
+    if (fieldResult.ok) applyFieldJobResult(fieldResult, false);
+  }
   vehicleUsageTime += dt;
   if (vehicleUsageTime >= 1) {
     flushVehicleUsage();
@@ -1960,13 +2302,18 @@ function update(dt) {
     if (p) addEnemy(p, enemies.length);
   }
   if (audio.motorGain) {
+    const record = company.ownership.vehicles.find(
+      (item) => item.id === player.vehicle?.ownershipId,
+    );
+    const engineRunning =
+      player.vehicle && (!record || (record.fuel > 0 && record.condition > 0));
     audio.motorGain.gain.setTargetAtTime(
-      player.vehicle && !settings.muted ? 0.035 : 0,
+      engineRunning && !settings.muted ? 0.035 : 0,
       audio.context.currentTime,
       0.1,
     );
     audio.motor.frequency.setTargetAtTime(
-      35 + Math.abs(player.vehicle?.speed || 0) * 5,
+      player.vehicle ? 28 + (player.vehicle.rpm || 850) / 48 : 28,
       audio.context.currentTime,
       0.1,
     );
@@ -2081,6 +2428,10 @@ document.addEventListener("pointerlockchange", () => {
 addEventListener("keydown", (event) => {
   const key = event.key.toLowerCase();
   if (state === "photo") return;
+  if (state === "jobs") {
+    if (key === "escape" || key === "j") fieldJobsPanel?.close();
+    return;
+  }
   if (state === "company" && key === "tab") {
     const controls = [
       ...$("company-panel").querySelectorAll(
@@ -2101,6 +2452,11 @@ addEventListener("keydown", (event) => {
     return;
   if (state === "map") {
     if (key === "escape" || key === "t") cityMapPanel?.close();
+    return;
+  }
+  if (key === "j" && state === "playing" && !event.repeat) {
+    event.preventDefault();
+    fieldJobsPanel?.open();
     return;
   }
   if (key === "t" && state === "playing") {
@@ -2292,6 +2648,43 @@ ownershipPanel = createOwnershipPanel({
     }
   },
 });
+fieldJobsPanel = createFieldJobsPanel({
+  getState: () => fieldJobs,
+  getWorld: () => world,
+  getContext: fieldContext,
+  onStart(id) {
+    const result = startFieldJob(fieldJobs, id, fieldContext());
+    if (result.ok) {
+      if (trials.active) trials = cancelTrial(trials).state;
+      activeContractId = placeTargetId = null;
+    }
+    return applyFieldJobResult(result);
+  },
+  onCancel: () => applyFieldJobResult(cancelFieldJob(fieldJobs)),
+  onTrack(point) {
+    if (mapId !== "cidade") return;
+    placeTargetId = point.id;
+    route = navigation.findPath(player.position, point);
+    routeTime = 5;
+    notify(
+      `Segue o marcador até ${point.label}. E permite interagir no local.`,
+      6,
+    );
+    updateMission();
+  },
+  onStateChange(open) {
+    if (open) {
+      setState("jobs");
+      $("story-toast").hidden = true;
+    } else if (state === "jobs") {
+      setState("playing");
+      last = performance.now();
+      saveCampaign();
+    }
+  },
+  notify,
+});
+$("open-jobs")?.addEventListener("click", () => fieldJobsPanel.open());
 cityMapPanel = createCityMapPanel({
   getWorld: () => world,
   getPlayer: () => player.position,
@@ -2380,6 +2773,7 @@ $("new-campaign").addEventListener("click", () => {
   started = false;
   savedCampaign = null;
   trials = createTrials();
+  fieldJobs = createFieldJobs();
   atmosphere?.dispose();
   atmosphere = null;
   atmosphereState = null;
@@ -2496,7 +2890,7 @@ if (savedCampaign) {
     -0.12,
     1.05,
   );
-  player.actor.group.position.copy(player.position);
+  placeCharacter(player.actor, player.position);
   cameraUpdate(0.5, true);
   $("play").textContent = "Continuar a minha história";
 }
@@ -2512,7 +2906,8 @@ if (new URLSearchParams(location.search).has("diagnostics")) {
       graphicsReady: () =>
         Promise.all([
           photoAssetsReady(),
-          scannedHeadsReady(),
+          humanAssetsReady(),
+          districtAssetsReady(),
           detailedVehicleAssetsReady(),
           furnitureAssetsReady(),
           visuals.ready,
@@ -2540,6 +2935,9 @@ if (new URLSearchParams(location.search).has("diagnostics")) {
               z: player.vehicle.position.z,
               yaw: player.vehicle.yaw,
               speed: player.vehicle.speed,
+              steering: player.vehicle.steering,
+              gear: player.vehicle.gear || 0,
+              rpm: player.vehicle.rpm || 0,
               ownershipId: player.vehicle.ownershipId || null,
               modelId: player.vehicle.modelId || "pickup",
               driverVisible: !!player.vehicle.driver?.group.visible,
@@ -2549,11 +2947,13 @@ if (new URLSearchParams(location.search).has("diagnostics")) {
           x: e.position.x,
           z: e.position.z,
           health: e.health,
+          missionRival: !!e.missionRival,
         })),
         company: JSON.parse(JSON.stringify(company)),
         ownership: getOwnershipView(company),
         atmosphere: atmosphere?.getState(),
         trials: getTrialsView(trials),
+        fieldJobs: getFieldJobsView(fieldJobs),
         cars: cars.map((car) => ({
           x: car.position.x,
           z: car.position.z,
@@ -2599,14 +2999,17 @@ if (new URLSearchParams(location.search).has("diagnostics")) {
         kills,
         cash: company.cash,
         renderer: {
+          playerGroundHeight: player.actor.group.position.y,
           photoMode: photoMode?.getState() || null,
           objectiveMarkerVisible: !!marker?.visible,
           quality: settings.quality,
           photographicAssets: getPhotoAssetState(),
-          scannedHead: getScannedHeadState(),
+          humanAssets: getHumanAssetState(),
+          district: getDistrictAssetState(),
           detailedVehicle: getDetailedVehicleState(),
           vehicleReflections: vehicleReflections.getState(),
           furniture: getFurnitureAssetState(),
+          crops: world.cropStats ? { ...world.cropStats } : null,
           urbanDetail: world.urbanStats ? { ...world.urbanStats } : null,
           vegetation: world.vegetationStats
             ? {
@@ -2641,7 +3044,8 @@ function frame(now) {
 requestAnimationFrame(frame);
 Promise.all([
   photoAssetsReady(),
-  scannedHeadsReady(),
+  humanAssetsReady(),
+  districtAssetsReady(),
   detailedVehicleAssetsReady(),
   furnitureAssetsReady(),
   visuals.ready,

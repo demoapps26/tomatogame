@@ -1,0 +1,6 @@
+# Upstream asset captures are hash-pinned. Keep their original bytes, whitespace
+# and Markdown underlines; changes are reviewed through provenance manifests.
+assets/human-v9/** -text
+assets/district-v9/** -text
+assets/human-v9/source/** binary
+assets/human-v9/LICENSE.md binary
