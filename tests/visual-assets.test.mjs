@@ -5,6 +5,46 @@ import { createCharacter } from "../src/actors.js";
 import { createDetailedSportVehicle } from "../src/vehicle-asset.js";
 import { createDetailedChair } from "../src/furniture-asset.js";
 
+test("walking and running keep a continuous gait independent of the session clock", () => {
+  const fresh = createCharacter(),
+    resumed = createCharacter();
+  const joints = [
+    "left-hip",
+    "right-hip",
+    "left-knee",
+    "right-knee",
+    "left-ankle",
+    "right-ankle",
+  ];
+  try {
+    for (let frame = 0; frame < 240; frame++) {
+      const speed = frame < 20 || frame >= 180 ? 0 : frame < 90 ? 4 : 7;
+      fresh.animate(1 / 60, speed, frame / 60);
+      resumed.animate(1 / 60, speed, 36000 + frame / 60);
+      for (const name of joints)
+        assert.equal(
+          fresh.group.getObjectByName(name).rotation.x,
+          resumed.group.getObjectByName(name).rotation.x,
+          `${name} changed phase because the session was older`,
+        );
+      if (frame % 12 === 0) {
+        const bounds = validateTransforms(fresh.group);
+        assert(
+          bounds.min.y >= -0.005,
+          "The planted sole went below the pavement",
+        );
+        assert(
+          bounds.max.y < 1.9,
+          "The walking rig lost its adult proportions",
+        );
+      }
+    }
+  } finally {
+    dispose(fresh.group);
+    dispose(resumed.group);
+  }
+});
+
 function resources(group) {
   const geometries = new Set(),
     materials = new Set(),

@@ -51,6 +51,8 @@ import {
   getFurnitureAssetState,
 } from "./furniture-asset.js";
 import { createVehicleReflections } from "./vehicle-reflections.js";
+import { cameraBoomPosition } from "./camera-obstruction.js";
+import { createPhotoMode } from "./photo-mode.js";
 
 const $ = (id) => document.getElementById(id);
 const canvas = $("view");
@@ -125,6 +127,7 @@ let activeContractId = savedCampaign?.activeContractId || null,
   estates = null,
   ownershipPanel = null,
   cityMapPanel = null,
+  photoMode = null,
   atmosphere = null,
   raceCourse = null;
 let trials = normalizeTrials(savedCampaign?.trials);
@@ -194,6 +197,7 @@ let wanted = 0,
   minimapTime = 0;
 let kills = 0,
   marker,
+  photoMarkerVisibility = null,
   markerRing,
   markerBeam,
   markerTime = 0;
@@ -794,6 +798,7 @@ function makeMarker() {
   markerBeam = tip;
 }
 function resetMap(id) {
+  photoMode?.close({ notify: false });
   vehicleReflections.reset();
   if (world) flushVehicleUsage(true);
   if (atmosphere) atmosphereState = atmosphere.getState();
@@ -1079,10 +1084,20 @@ function lockMouse() {
   } catch {}
 }
 function setState(next) {
+  if (state === "photo" && next !== "photo") {
+    if (marker && photoMarkerVisibility !== null)
+      marker.visible = photoMarkerVisibility;
+    photoMarkerVisibility = null;
+  } else if (next === "photo" && state !== "photo") {
+    photoMarkerVisibility = marker ? marker.visible : null;
+    if (marker) marker.visible = false;
+  }
   state = next;
   renderDirty = true;
   document.body.dataset.state = next;
-  $("hud").inert = ["company", "venue", "ownership", "map"].includes(next);
+  $("hud").inert = ["company", "venue", "ownership", "map", "photo"].includes(
+    next,
+  );
   atmosphere?.setActive(next === "playing");
   keys.clear();
   fireHeld = false;
@@ -1120,6 +1135,7 @@ function play() {
   }
 }
 function pause() {
+  if (state === "photo") photoMode?.close();
   if (state !== "playing") return;
   saveCampaign();
   setState("menu");
@@ -1704,21 +1720,9 @@ function cameraUpdate(dt, instant = false) {
       Math.sin(yaw) * shoulder,
   );
   cameraDesired.y = Math.max(0.65, cameraDesired.y);
-  for (let t = 0.1; t <= 1; t += 0.05) {
-    const x = THREE.MathUtils.lerp(lookTarget.x, cameraDesired.x, t),
-      z = THREE.MathUtils.lerp(lookTarget.z, cameraDesired.z, t);
-    if (
-      hitBox(x, z, 0.15, THREE.MathUtils.lerp(lookTarget.y, cameraDesired.y, t))
-    ) {
-      cameraDesired.lerpVectors(
-        lookTarget,
-        cameraDesired,
-        Math.max(0.12, t - 0.07),
-      );
-      cameraDesired.y = Math.max(1, cameraDesired.y);
-      break;
-    }
-  }
+  cameraDesired.copy(
+    cameraBoomPosition(lookTarget, cameraDesired, world?.colliders),
+  );
   cameraTarget.copy(lookTarget);
   if (chase) {
     cameraTarget.x += Math.sin(player.vehicle.yaw) * chase.targetAhead;
@@ -1728,6 +1732,9 @@ function cameraUpdate(dt, instant = false) {
   cameraTarget.z -= Math.sin(yaw) * shoulder;
   if (instant) camera.position.copy(cameraDesired);
   else camera.position.lerp(cameraDesired, 1 - Math.exp(-dt * 14));
+  camera.position.copy(
+    cameraBoomPosition(lookTarget, camera.position, world?.colliders),
+  );
   camera.lookAt(cameraTarget);
 }
 function drawMinimap() {
@@ -2073,6 +2080,7 @@ document.addEventListener("pointerlockchange", () => {
 });
 addEventListener("keydown", (event) => {
   const key = event.key.toLowerCase();
+  if (state === "photo") return;
   if (state === "company" && key === "tab") {
     const controls = [
       ...$("company-panel").querySelectorAll(
@@ -2141,6 +2149,7 @@ addEventListener("keydown", (event) => {
     keys.add(key);
   }
   if (event.repeat) return;
+  if (key === "v" && state === "playing") openPhotoMode();
   if (key === "escape" || key === "p" || key === "m") {
     if (state === "playing") pause();
     else if (state === "menu" && started && key !== "m") play();
@@ -2302,6 +2311,48 @@ cityMapPanel = createCityMapPanel({
   },
 });
 $("open-city-map")?.addEventListener("click", () => cityMapPanel.open());
+photoMode = createPhotoMode({
+  camera,
+  canvas,
+  onChange: () => {
+    renderDirty = true;
+  },
+  onClose() {
+    if (state !== "photo") return;
+    setState("playing");
+    last = performance.now();
+  },
+  async onCapture() {
+    photoMode.update();
+    visuals.update(0, player.position, company.day);
+    visuals.render();
+    const blob = await new Promise((resolve) =>
+      canvas.toBlob(resolve, "image/png"),
+    );
+    if (!blob)
+      throw new Error("Não foi possível criar a imagem. Tenta novamente.");
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `TomatoRepublic-${mapId}-${new Date().toISOString().replace(/[:.]/g, "-")}.png`;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  },
+});
+function openPhotoMode() {
+  if (state !== "playing" || !photoMode) return;
+  setState("photo");
+  $("story-toast").hidden = true;
+  photoMode.open({
+    target: player.position,
+    vehicle: !!player.vehicle,
+    bounds: world.bounds,
+    colliders: world.colliders,
+  });
+}
+$("open-photo")?.addEventListener("click", openPhotoMode);
 $("weather")?.addEventListener("change", () => {
   atmosphere?.setWeather($("weather").value);
   renderDirty = true;
@@ -2477,7 +2528,12 @@ if (new URLSearchParams(location.search).has("diagnostics")) {
           yaw: player.yaw,
           driving: !!player.vehicle,
         },
-        camera: { yaw, pitch },
+        camera: {
+          yaw,
+          pitch,
+          position: camera.position.toArray(),
+          fov: camera.fov,
+        },
         vehicle: player.vehicle
           ? {
               x: player.vehicle.position.x,
@@ -2543,6 +2599,8 @@ if (new URLSearchParams(location.search).has("diagnostics")) {
         kills,
         cash: company.cash,
         renderer: {
+          photoMode: photoMode?.getState() || null,
+          objectiveMarkerVisible: !!marker?.visible,
           quality: settings.quality,
           photographicAssets: getPhotoAssetState(),
           scannedHead: getScannedHeadState(),
@@ -2573,6 +2631,7 @@ function frame(now) {
     world?.update?.(time, player.position);
   } else if (!renderDirty) return;
   if (!started) cameraUpdate(dt);
+  if (state === "photo") photoMode?.update();
   visuals.update(dt, player.position, company.day);
   if (state === "playing" && !transitioning)
     vehicleReflections.update(dt, player.vehicle, settings.quality);

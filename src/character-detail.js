@@ -398,6 +398,8 @@ export function createDetailedCharacter({
   const group = new THREE.Group(),
     rig = new THREE.Group(),
     body = new THREE.Group();
+  rig.name = "human-pelvis-rig";
+  body.name = "human-upper-body";
   group.add(rig);
   rig.add(body);
   const shortSleeves = civilian && Math.abs(index) % 4 === 1;
@@ -527,6 +529,7 @@ export function createDetailedCharacter({
     ),
     panel,
   );
+  const beforeHead = new Set(body.children);
   const head = createScannedHead({ index: enemy ? index + 2 : index });
   body.add(head);
   if (civilian && index % 3 !== 0) hairCap(body, head, hair, index);
@@ -589,6 +592,7 @@ export function createDetailedCharacter({
       0.001,
     );
   }
+  const headParts = body.children.filter((part) => !beforeHead.has(part));
   if (!civilian) {
     const pack = cloth(enemy ? 0x625346 : 0x795343, garmentMaps),
       packPanel = cloth(enemy ? 0x53483e : 0x654537, garmentMaps);
@@ -642,6 +646,7 @@ export function createDetailedCharacter({
     hands = [];
   for (const side of [-1, 1]) {
     const leg = new THREE.Group();
+    leg.name = side < 0 ? "left-hip" : "right-hip";
     leg.position.set(side * 0.102, 0.895, 0);
     rig.add(leg);
     add(
@@ -673,6 +678,7 @@ export function createDetailedCharacter({
       0.0008,
     );
     const shin = new THREE.Group();
+    shin.name = side < 0 ? "left-knee" : "right-knee";
     shin.position.set(0, -0.414, 0.003);
     leg.add(shin);
     add(
@@ -721,6 +727,7 @@ export function createDetailedCharacter({
       trousers,
     );
     const foot = new THREE.Group();
+    foot.name = side < 0 ? "left-ankle" : "right-ankle";
     foot.position.set(0, -0.391, 0.006);
     shin.add(foot);
     add(foot, shoeGeometry(), leather);
@@ -743,6 +750,7 @@ export function createDetailedCharacter({
     feet.push(foot);
 
     const arm = new THREE.Group();
+    arm.name = side < 0 ? "left-shoulder" : "right-shoulder";
     arm.position.set(side * 0.233, 1.363, -0.002);
     arm.rotation.z = -side * 0.063;
     body.add(arm);
@@ -789,6 +797,7 @@ export function createDetailedCharacter({
       );
     } else add(arm, loft(upper, 22, 0.0018), jacket);
     const elbow = new THREE.Group();
+    elbow.name = side < 0 ? "left-elbow" : "right-elbow";
     elbow.position.set(0, -0.278, 0);
     elbow.rotation.x = -0.12;
     arm.add(elbow);
@@ -969,20 +978,57 @@ export function createDetailedCharacter({
   }
   for (const arm of arms) arm.position.y += 0.046;
   for (const foot of feet) foot.scale.x = 0.82;
+  // Move the complete photographed head, hair and cap as one unit about the
+  // lower neck. The scanned face and its fixed expression are left untouched.
+  const headPivot = new THREE.Group();
+  headPivot.name = "head-attention-pivot";
+  headPivot.position.set(0, 1.5, 0);
+  headPivot.userData.source = head.userData.source;
+  headPivot.userData.license = head.userData.license;
+  for (const part of headParts) {
+    body.remove(part);
+    headPivot.add(part);
+    part.position.sub(headPivot.position);
+  }
+  body.add(headPivot);
+  merge(headPivot);
   merge(body);
   group.name = civilian
     ? `citizen-${index}`
     : enemy
       ? "rival-gardener"
       : "player-gardener";
-  group.userData.characterDetail = "tailored-human-v7";
+  group.userData.characterDetail = "tailored-human-v8";
   const armRestPositions = arms.map((arm) => arm.position.clone());
-  let drivingPose = false;
+  const personality = (Math.abs(index) % 97) * 1.71;
+  let drivingPose = false,
+    gaitPhase = (Math.abs(index) * 0.83) % TAU,
+    locomotionSpeed = 0,
+    aimWeight = 0,
+    animationClock = 0;
+  // The sole's front/back corners provide a cheap analytic ground contact.
+  // This avoids the floating straight-legged feet of the earlier sine walk.
+  function lowestSole(index) {
+    const thigh = legs[index].rotation.x,
+      lower = thigh + shins[index].rotation.x,
+      shoe = lower + feet[index].rotation.x;
+    const ankleY =
+      legs[index].position.y +
+      shins[index].position.y * Math.cos(thigh) -
+      shins[index].position.z * Math.sin(thigh) +
+      feet[index].position.y * Math.cos(lower) -
+      feet[index].position.z * Math.sin(lower);
+    const heel = -0.09 * Math.cos(shoe) + 0.109 * Math.sin(shoe),
+      toe = -0.09 * Math.cos(shoe) - 0.186 * Math.sin(shoe);
+    return ankleY + Math.min(heel, toe);
+  }
   return {
     group,
     setDrivingPose(steering = 0) {
       const turn = THREE.MathUtils.clamp(finite(steering), -0.7, 0.7);
       drivingPose = true;
+      locomotionSpeed = 0;
+      aimWeight = 0;
       rig.position.set(0, 0, 0);
       rig.rotation.set(0, 0, 0);
       // A low driving seat has raised knees and feet extended to the pedals.
@@ -1010,7 +1056,8 @@ export function createDetailedCharacter({
         pivotHeight * (1 - Math.cos(recline)),
         -pivotHeight * Math.sin(recline),
       );
-      body.scale.y = 1;
+      body.scale.set(1, 1, 1);
+      headPivot.rotation.set(0, turn * 0.09, -turn * 0.014);
     },
     animate(dt, speed = 0, time = 0, aiming = false) {
       if (drivingPose) {
@@ -1023,53 +1070,198 @@ export function createDetailedCharacter({
           hands[index].rotation.set(0, 0, 0);
         }
       }
-      const step = Math.max(0, finite(dt)),
-        clock = finite(time),
-        motion = Math.min(1, Math.abs(finite(speed)) / 3.7);
-      const phase = clock * (8.1 + motion * 2),
-        swing = Math.sin(phase) * 0.56 * motion,
-        blend = 1 - Math.exp(-step * 13);
-      const damp = (value, target) =>
-        THREE.MathUtils.lerp(value, target, blend);
-      legs[0].rotation.x = damp(legs[0].rotation.x, swing);
-      legs[1].rotation.x = damp(legs[1].rotation.x, -swing);
-      shins[0].rotation.x = damp(
-        shins[0].rotation.x,
-        Math.max(0, -Math.sin(phase)) * 0.64 * motion,
+      const step = Math.min(0.25, Math.max(0, finite(dt))),
+        // Idle frequencies are multiples of .01, so this wraps seamlessly and
+        // keeps even a very large caller timestamp away from sine overflow.
+        clock = (finite(time, animationClock) % (TAU * 100)) + personality;
+      animationClock = (animationClock + step) % (TAU * 100);
+      const targetSpeed = Math.min(10, Math.abs(finite(speed))),
+        priorSpeed = locomotionSpeed,
+        response = targetSpeed > priorSpeed ? 8 : 12,
+        decay = Math.exp(-step * response);
+      locomotionSpeed = targetSpeed + (priorSpeed - targetSpeed) * decay;
+      const integratedSpeed =
+        targetSpeed * step +
+        ((priorSpeed - targetSpeed) * (1 - decay)) / response;
+      // Integrate cadence instead of multiplying absolute time by current
+      // speed: changing pace can no longer teleport the legs to a new phase.
+      if (locomotionSpeed > 0.005 || targetSpeed > 0)
+        gaitPhase = (gaitPhase + 6.8 * step + 0.95 * integratedSpeed) % TAU;
+      // A square-root stride keeps slow citizens taking proper steps rather
+      // than shuffling tiny arcs while their world positions keep moving.
+      const motion = Math.sqrt(
+          THREE.MathUtils.clamp(locomotionSpeed / 3.8, 0, 1),
+        ),
+        running = THREE.MathUtils.smoothstep(locomotionSpeed, 4.2, 6.8),
+        idle = 1 - motion,
+        blend = 1 - Math.exp(-step * 15),
+        upperBlend = 1 - Math.exp(-step * 8);
+      const damp = (value, target, weight = blend) =>
+        THREE.MathUtils.lerp(value, target, weight);
+      aimWeight = damp(aimWeight, aiming ? 1 : 0, 1 - Math.exp(-step * 11));
+      const breath =
+          Math.sin(clock * 1.65) + Math.sin(clock * 0.71 + 0.7) * 0.18,
+        gaitSine = Math.sin(gaitPhase),
+        acceleration =
+          step > 0
+            ? THREE.MathUtils.clamp(
+                (locomotionSpeed - priorSpeed) / step,
+                -10,
+                10,
+              )
+            : 0;
+      for (let index = 0; index < legs.length; index++) {
+        const side = index === 0 ? -1 : 1,
+          phase = gaitPhase + index * Math.PI,
+          wave = Math.sin(phase),
+          recovery = Math.max(0, -Math.cos(phase));
+        const hip =
+          wave *
+          (wave > 0
+            ? THREE.MathUtils.lerp(0.36, 0.62, running)
+            : THREE.MathUtils.lerp(0.43, 0.84, running)) *
+          motion;
+        const knee =
+          (0.045 +
+            Math.pow(recovery, 1.35) *
+              THREE.MathUtils.lerp(0.72, 1.18, running)) *
+          motion;
+        const ankle =
+          THREE.MathUtils.clamp(-(hip + knee) * 0.65, -0.4, 0.3) -
+          recovery * 0.065 * motion;
+        legs[index].rotation.x = damp(legs[index].rotation.x, hip);
+        shins[index].rotation.x = damp(shins[index].rotation.x, knee);
+        feet[index].rotation.x = damp(feet[index].rotation.x, ankle);
+        // Relaxed walking arms oppose the leg; sprinting bends the elbow and
+        // brings the swing close to the body rather than windmilling sideways.
+        const normalArm =
+            -wave * THREE.MathUtils.lerp(0.31, 0.62, running) * motion,
+          aimedArm = index === 1 ? -1.23 : -0.18,
+          normalElbow = THREE.MathUtils.lerp(
+            -0.12 - motion * (0.15 + recovery * 0.15),
+            -1.02 + wave * 0.14,
+            running,
+          ),
+          aimedElbow = index === 1 ? -0.52 : -0.32;
+        arms[index].rotation.x = damp(
+          arms[index].rotation.x,
+          THREE.MathUtils.lerp(normalArm, aimedArm, aimWeight),
+          upperBlend,
+        );
+        arms[index].rotation.y = damp(
+          arms[index].rotation.y,
+          -side * 0.022 + gaitSine * 0.018 * motion * (1 - aimWeight),
+          upperBlend,
+        );
+        arms[index].rotation.z = damp(
+          arms[index].rotation.z,
+          -side * (0.048 + motion * 0.018) +
+            (index === 1 ? -0.14 * aimWeight : 0.02 * aimWeight),
+          upperBlend,
+        );
+        elbows[index].rotation.x = damp(
+          elbows[index].rotation.x,
+          THREE.MathUtils.lerp(normalElbow, aimedElbow, aimWeight),
+          upperBlend,
+        );
+        hands[index].rotation.x = damp(
+          hands[index].rotation.x,
+          -0.025 - running * 0.04 + Math.sin(phase + 0.4) * 0.025 * motion,
+          upperBlend,
+        );
+        hands[index].rotation.y = damp(
+          hands[index].rotation.y,
+          -side * THREE.MathUtils.lerp(0.32, 0.16, aimWeight),
+          upperBlend,
+        );
+        hands[index].rotation.z = damp(
+          hands[index].rotation.z,
+          Math.sin(clock * 0.79 + side) * 0.009 * idle,
+          upperBlend,
+        );
+        arms[index].position.copy(armRestPositions[index]);
+        arms[index].position.x += side * breath * 0.0017 * idle;
+        arms[index].position.y += breath * 0.0015 * idle;
+        arms[index].position.z += aimWeight * 0.012;
+      }
+      rig.rotation.y = damp(
+        rig.rotation.y,
+        -gaitSine * 0.018 * motion,
+        upperBlend,
       );
-      shins[1].rotation.x = damp(
-        shins[1].rotation.x,
-        Math.max(0, Math.sin(phase)) * 0.64 * motion,
+      rig.rotation.z = damp(
+        rig.rotation.z,
+        gaitSine * 0.009 * motion +
+          Math.sin(clock * 0.39 + 0.3) * 0.0035 * idle,
+        upperBlend,
       );
-      feet[0].rotation.x = damp(
-        feet[0].rotation.x,
-        -Math.sin(phase) * 0.09 * motion,
+      rig.position.x = damp(
+        rig.position.x,
+        gaitSine * 0.006 * motion + Math.sin(clock * 0.39 + 0.3) * 0.003 * idle,
+        upperBlend,
       );
-      feet[1].rotation.x = damp(
-        feet[1].rotation.x,
-        Math.sin(phase) * 0.09 * motion,
+      const grounded = THREE.MathUtils.clamp(
+          -Math.min(lowestSole(0), lowestSole(1)),
+          -0.12,
+          0.12,
+        ),
+        flight =
+          running *
+          motion *
+          Math.pow(Math.max(0, Math.sin(gaitPhase * 2)), 2) *
+          0.022,
+        groundTarget = grounded + flight + 0.002;
+      rig.position.y = Math.max(
+        groundTarget,
+        damp(rig.position.y, groundTarget),
       );
-      arms[0].rotation.x = damp(arms[0].rotation.x, -swing * 0.64);
-      arms[1].rotation.x = damp(
-        arms[1].rotation.x,
-        aiming ? -1.23 : swing * 0.64,
+      const lean =
+        motion * THREE.MathUtils.lerp(0.022, 0.092, running) +
+        THREE.MathUtils.clamp(acceleration * 0.0035, -0.026, 0.035);
+      body.rotation.x = damp(body.rotation.x, lean, upperBlend);
+      body.rotation.y = damp(
+        body.rotation.y,
+        gaitSine * 0.037 * motion * (1 - aimWeight * 0.75) +
+          Math.sin(clock * 0.39 + 0.3) * 0.004 * idle,
+        upperBlend,
       );
-      arms[1].rotation.z = damp(arms[1].rotation.z, aiming ? -0.2 : -0.063);
-      elbows[0].rotation.x = damp(
-        elbows[0].rotation.x,
-        -0.12 - motion * (0.13 + Math.max(0, -Math.sin(phase)) * 0.18),
+      body.rotation.z = damp(
+        body.rotation.z,
+        breath * 0.002 * idle,
+        upperBlend,
       );
-      elbows[1].rotation.x = damp(
-        elbows[1].rotation.x,
-        aiming
-          ? -0.48
-          : -0.12 - motion * (0.13 + Math.max(0, Math.sin(phase)) * 0.18),
+      const pivotHeight = 0.895;
+      body.position.set(
+        0,
+        pivotHeight * (1 - Math.cos(body.rotation.x)),
+        -pivotHeight * Math.sin(body.rotation.x),
       );
-      rig.position.y = Math.abs(Math.sin(phase)) * 0.013 * motion;
-      rig.rotation.z = Math.sin(phase) * 0.008 * motion;
-      body.rotation.y = Math.sin(phase) * 0.028 * motion;
-      body.rotation.x = motion * 0.018;
-      body.scale.y = 1 + Math.sin(clock * 1.55 + index) * 0.0013 * (1 - motion);
+      body.scale.y = damp(
+        body.scale.y,
+        1 + breath * 0.0025 * (1 - motion * 0.65),
+        upperBlend,
+      );
+      body.scale.z = damp(body.scale.z, 1 + breath * 0.004 * idle, upperBlend);
+      const attention = idle * (1 - aimWeight),
+        headYaw =
+          attention *
+            (Math.sin(clock * 0.37 + 0.5) * 0.088 +
+              Math.sin(clock * 0.83 + personality * 0.3) * 0.027) -
+          (body.rotation.y + rig.rotation.y) * 0.75 * motion;
+      headPivot.rotation.y = damp(headPivot.rotation.y, headYaw, upperBlend);
+      headPivot.rotation.x = damp(
+        headPivot.rotation.x,
+        Math.sin(clock * 0.53 + 0.8) * 0.017 * attention -
+          body.rotation.x * 0.6 +
+          breath * 0.004 * idle,
+        upperBlend,
+      );
+      headPivot.rotation.z = damp(
+        headPivot.rotation.z,
+        Math.sin(clock * 0.29 + personality) * 0.012 * attention -
+          rig.rotation.z * 0.4,
+        upperBlend,
+      );
     },
   };
 }

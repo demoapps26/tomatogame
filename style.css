@@ -680,6 +680,40 @@ h1 em {
   font-size: 6px;
 }
 /* In-game instruments */
+body[data-state="photo"] #menu,
+body[data-state="photo"] #hud,
+body[data-state="photo"] #story-toast {
+  display: none !important;
+}
+#open-photo {
+  position: absolute;
+  top: 82px;
+  right: 29px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto;
+  padding: 8px 10px;
+  color: #eee9d5;
+  font:
+    600 11px Inter,
+    system-ui,
+    sans-serif;
+  background: #1b322ad9;
+  border: 1px solid #a8b48c66;
+  border-radius: 5px;
+}
+@media (max-width: 700px) {
+  #open-photo {
+    top: 69px;
+    right: 17px;
+    padding: 9px;
+  }
+  #open-photo .photo-label,
+  #open-photo kbd {
+    display: none;
+  }
+}
 #hud {
   position: absolute;
   inset: 0;

@@ -1,6 +1,6 @@
 # Tomato Republic — Uma cidade, uma empresa, um legado 🍅
 
-**Versão 0.7.** Um jogo original para um jogador que junta exploração em terceira pessoa, condução e gestão de uma empresa de tomates. Esta versão refaz a imagem da cidade: vidro com interiores aparentes, fachadas e passeios detalhados, árvores de quatro espécies, personagens com roupa e proporções revistas, casas mais mobiladas e um desportivo com carroçaria e interior de um modelo 3D profissional. Herdaste a pequena estufa de Anselmo, a última colheita e uma dívida de 5 000 €. Podes entrar na loja e na estufa, cuidar da colheita, negociar presencialmente e construir uma frota que trabalha enquanto exploras a cidade.
+**Versão 0.8.** Um jogo original para um jogador que junta exploração em terceira pessoa, condução e gestão de uma empresa de tomates. Esta versão acrescenta um modo fotografia, revê o céu e a luz ao longo do dia, melhora a marcha das personagens e dá mais detalhe às ruas. A cidade inclui vidro com interiores aparentes, fachadas e passeios detalhados, árvores de quatro espécies, personagens com roupa e proporções revistas, casas mais mobiladas e um desportivo com carroçaria e interior de um modelo 3D profissional. Herdaste a pequena estufa de Anselmo, a última colheita e uma dívida de 5 000 €. Podes entrar na loja e na estufa, cuidar da colheita, negociar presencialmente e construir uma frota que trabalha enquanto exploras a cidade.
 
 ## Jogar
 
@@ -85,6 +85,7 @@ O dia empresarial só avança quando escolhes **Encerrar o dia**. Nesse momento 
 | Empresa                                | B ou botão Empresa                       |
 | Património, garagem, casas e percursos | G ou botão Património                    |
 | Mapa geral e destinos                  | T ou botão Mapa                          |
+| Modo fotografia                        | V ou botão Fotografia                    |
 | Arremessar tomate a pé                 | Clique esquerdo; manter premido continua |
 | Recarregar                             | R                                        |
 | Pausa / retoma                         | Esc ou P                                 |
@@ -94,9 +95,15 @@ O combate com tomates continua disponível como atividade de exploração. As pa
 
 Ao conduzir, a câmara acompanha suavemente as curvas e ajusta a distância à velocidade. O rato permite olhar em redor; cerca de dois segundos depois do último movimento, a vista regressa à direção do carro. A marcha atrás mantém a orientação estável.
 
+## Fotografar a cidade
+
+Carrega em **V** ou no botão **Fotografia** para pausar a ação e enquadrar a cidade, o carro ou a tua personagem. Arrasta o cenário para rodar a câmara; a roda do rato aproxima ou afasta. Os controlos permitem ajustar a distância, a altura e o campo de visão, escolher vistas de frente, de lado ou aéreas e mostrar uma grelha de composição.
+
+**Guardar PNG** descarrega uma imagem do cenário sem os painéis do jogo. **H** esconde os controlos; **V**, **Esc** ou **Voltar** retoma a partida. O relógio, a empresa, as entregas e os percursos ficam pausados; fotografar não altera o progresso guardado.
+
 ## Guardar e continuar
 
-A campanha guarda automaticamente no navegador: empresa, decisões, dia, contratos aceites, saldo, posição, vida, munições, veículo utilizado, frota em viagem, loja, trabalhos da estufa, carros próprios, casas, mobiliário, marcos, percursos, hora e clima. Recarregar a página permite continuar. As preferências de imagem e som também ficam guardadas. As campanhas das versões 0.3–0.6 são atualizadas sem apagar as decisões anteriores.
+A campanha guarda automaticamente no navegador: empresa, decisões, dia, contratos aceites, saldo, posição, vida, munições, veículo utilizado, frota em viagem, loja, trabalhos da estufa, carros próprios, casas, mobiliário, marcos, percursos, hora e clima. Recarregar a página permite continuar. As preferências de imagem e som também ficam guardadas. As campanhas das versões 0.3–0.7 são atualizadas sem apagar as decisões anteriores.
 
 Em **Empresa**, **Exportar progresso** cria um ficheiro JSON. **Importar progresso** permite continuar noutro navegador ou recuperar um ficheiro guardado. Usa a exportação antes de mudar de dispositivo ou de substituir a pasta do jogo: o armazenamento de ficheiros locais pode variar entre navegadores.
 
@@ -108,6 +115,8 @@ Um ciclo de 24 horas demora cerca de 36 minutos de jogo ativo. O relógio e o cl
 
 ## Imagem e desempenho
 
+A versão 0.8 liga a direção solar à hora, acrescenta nuvens em camadas com bases sombreadas e contornos iluminados e distingue amanhecer, tarde e pôr-do-sol. Bancos, papeleiras, canteiros, cartazes e detalhes comerciais dão mais presença às frentes urbanas. A marcha tem fase contínua, apoio dos pés e transições suaves entre andar, correr e parar; a cabeça e o tronco têm movimentos discretos de atenção e respiração.
+
 A versão 0.7 acrescenta janelas com **parallax interior**: cada vidro mostra uma sala com profundidade aparente, cortinas e ocupação próprias. À noite, apenas parte das janelas acende. Fachadas ganham frisos, rodapés de pedra, varandas de ferro, estores, toldos e placas portuguesas. O pavimento acompanha as frentes urbanas e liga-as aos passeios.
 
 As árvores têm troncos e ramos articulados, folhas recortadas com nervuras, quatro espécies e movimento discreto. As personagens usam malhas de roupa mais contínuas, pregas, costuras, mãos e calçado proporcionados. As casas recebem cozinhas, roupeiros, sofás, camas, cortinas e tapetes; no conforto 3, média/alta qualidade apresenta uma poltrona de modelo profissional com madeira curva e tecido.
@@ -116,7 +125,7 @@ O **GT Vermelho** usa uma adaptação de **CarConcept**, de Eric Chadwick / Darm
 
 A versão usa **sete conjuntos de materiais fotográficos CC0**, com cor, normal OpenGL e rugosidade em 1K: asfalto, betão, reboco, solo, madeira, cerâmica e tecido. Os três canais mantêm a mesma escala em metros nas fachadas e no pavimento, incluindo edifícios instanciados.
 
-O ambiente HDR **Rooitou Park**, da Poly Haven, fornece iluminação e reflexos fotográficos. A luz solar acompanha a direção da fotografia; as sombras próximas têm maior resolução. O mapeamento de tons AgX preserva melhor o detalhe de materiais claros e metal pintado. A loja tem cerâmica de 60 cm e equipamento mais detalhado; fachadas ganham caleiras, tubos e caixilharias. Comida, bancas e plantas têm proporções revistas.
+O ambiente HDR **Rooitou Park**, da Poly Haven, fornece iluminação e reflexos fotográficos. A direção inicial da luz parte da fotografia; na versão 0.8, acompanha o relógio da cidade. As sombras próximas têm maior resolução. O mapeamento de tons AgX preserva melhor o detalhe de materiais claros e metal pintado. A loja tem cerâmica de 60 cm e equipamento mais detalhado; fachadas ganham caleiras, tubos e caixilharias. Comida, bancas e plantas têm proporções revistas.
 
 As personagens usam uma cabeça digitalizada com textura fotográfica e mapa de relevo, adaptada do modelo **Infinite, de Lee Perry-Smith**, sob licença **CC BY 3.0**. O scan mantém a expressão fixa e os olhos fechados do original; ainda não há animação facial. Os créditos estão disponíveis no menu, incluindo na distribuição de um único HTML.
 
@@ -124,7 +133,7 @@ O modo **Realismo** acrescenta oclusão de contacto GTAO e antialiasing MSAA de 
 
 Os edifícios, a vegetação e os corpos das personagens continuam procedurais; o desportivo, a poltrona, os rostos e os materiais usam os recursos detalhados indicados nos créditos. A fidelidade de uma produção como GTA exige ainda cenários e animações de outra escala. Esta versão mantém um jogo autónomo de navegador, sem captura de movimento nem desempenho certificado em equipamento físico. As fontes e licenças dos recursos fotográficos estão em [ATTRIBUTIONS.md](ATTRIBUTIONS.md).
 
-Capturas desta versão, sem retoques: [condução em Realismo](docs/screenshots/v0.7-driving.png) e [interior mobilado no motor em qualidade Equilibrada](docs/screenshots/v0.7-interior.png).
+Capturas da versão 0.8, sem retoques e em qualidade Equilibrada: [PNG exportado pelo jogo](docs/screenshots/v0.8-photo.png) e [modo fotografia em utilização](docs/screenshots/v0.8-photo-mode.png).
 
 ## Desenvolver
 
@@ -167,6 +176,8 @@ O build gera o **index.html** autónomo da raiz e as cópias em `dist/`. A vers�
 - `src/vehicle-reflections.js`: captura progressiva dos reflexos locais do veículo.
 - `src/life.js`: tráfego e peões.
 - `src/graphics.js`: céu, iluminação, reflexos e modos de imagem.
+- `src/photo-mode.js`: enquadramento, composição e captura PNG.
+- `src/camera-obstruction.js`: proteção da câmara junto a paredes e mobiliário.
 - `src/material-library.js`: projeção física dos materiais fotográficos.
 - `src/photo-assets.js`: recursos incorporados, carregamento e partilha de texturas.
 - `src/scanned-head.js`: adaptação do modelo digitalizado e materiais de pele.

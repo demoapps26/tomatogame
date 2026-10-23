@@ -138,6 +138,7 @@ test("local weather lights stay bounded, wet roads restore, and disposal release
     assert.equal(windowMaterial.emissiveIntensity, 0.11);
     atmosphere.setTime(450);
     assert.equal(atmosphere.getState().clock, "07:30");
+    assert.equal(visualStates.at(-1).minutes, 450);
     assert.equal(countLights(), 8);
     atmosphere.dispose();
     atmosphere.dispose();

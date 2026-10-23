@@ -263,6 +263,7 @@ export function createAtmosphere(
     const daylight = daylightForTime(state.minutes),
       night = 1 - daylight;
     visuals.setAtmosphere?.({
+      minutes: state.minutes,
       daylight,
       night,
       cloudiness: state.cloudiness,
