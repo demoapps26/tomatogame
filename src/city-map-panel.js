@@ -26,6 +26,13 @@ const CATEGORIES = [
   ["trials", "Percursos"],
 ];
 const TYPES = {
+  "manual-work": {
+    category: "company",
+    color: "#d0b885",
+    symbol: "P",
+    tag: "Preparação manual",
+    note: "Prepara caixas nas estações da sede e recebe após a expedição do lote.",
+  },
   "field-jobs": {
     category: "company",
     color: "#c4ac70",

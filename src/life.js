@@ -129,10 +129,31 @@ function roadFallback(world) {
   ];
 }
 
+/** A fixed actor budget; the wider urban population is exclusive to Santa Tomata. */
+export function cityLifeCounts(world, quality = "medium") {
+  if (world?.group?.name === "world-cidade")
+    return quality === "high" ? [12, 28] : quality === "low" ? [3, 6] : [8, 14];
+  return quality === "high" ? [10, 20] : quality === "low" ? [3, 5] : [6, 10];
+}
+
 /** Ambient life owns its actors only; the caller owns lights, world and player. */
 export function createCityLife(scene, world, quality = "medium") {
-  const counts =
-    quality === "high" ? [10, 20] : quality === "low" ? [3, 5] : [6, 10];
+  const counts = cityLifeCounts(world, quality);
+  const city = world.group?.name === "world-cidade";
+  const initialNearbyPeople = city
+    ? quality === "high"
+      ? 8
+      : quality === "low"
+        ? 2
+        : 5
+    : 2;
+  const minimumNearbyPeople = city
+    ? quality === "high"
+      ? 6
+      : quality === "low"
+        ? 2
+        : 4
+    : 2;
   const sourceRoads =
     Array.isArray(world.trafficRoutes) && world.trafficRoutes.length
       ? world.trafficRoutes
@@ -370,8 +391,16 @@ export function createCityLife(scene, world, quality = "medium") {
       visible: true,
     };
     const nearby =
-      (index < 2
-        ? placeNear(pedestrian, walkRoutes, spawn, 22 + index * 16, true, 6, 90)
+      (index < initialNearbyPeople
+        ? placeNear(
+            pedestrian,
+            walkRoutes,
+            spawn,
+            22 + index * (city ? 8 : 16),
+            true,
+            6,
+            90,
+          )
         : placeAlongCurrent(pedestrian, true)) ||
       placeNear(pedestrian, walkRoutes, spawn, 90 + index * 10, true, 6);
     if (!nearby) {
@@ -413,15 +442,25 @@ export function createCityLife(scene, world, quality = "medium") {
             person.position.z - player.z,
           ) < 100,
       ).length;
-      if (nearbyPeople < 2) {
+      if (nearbyPeople < minimumNearbyPeople) {
         const distant = pedestrians.find(
           (person) =>
+            (!city || !person.visible) &&
             Math.hypot(
               person.position.x - player.x,
               person.position.z - player.z,
             ) > 150,
         );
-        if (distant) placeNear(distant, walkRoutes, player, 65, true, 42, 115);
+        if (distant)
+          placeNear(
+            distant,
+            walkRoutes,
+            player,
+            65,
+            true,
+            42,
+            city ? 100 : 115,
+          );
       }
     }
     for (const vehicle of vehicles) {

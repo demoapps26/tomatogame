@@ -83,6 +83,7 @@ function createAtmosphericSky(texture, haze, solarDirection) {
       solarDirection: { value: solarDirection.clone() },
       keyDirection: { value: solarDirection.clone() },
       twilight: { value: 0 },
+      citySkyProfile: { value: 0 },
     },
     vertexShader: /* glsl */ `
       varying vec3 vDirection;
@@ -102,6 +103,7 @@ function createAtmosphericSky(texture, haze, solarDirection) {
       uniform vec3 solarDirection;
       uniform vec3 keyDirection;
       uniform float twilight;
+      uniform float citySkyProfile;
       varying vec3 vDirection;
 
       float skyHash(vec2 p) {
@@ -138,7 +140,7 @@ function createAtmosphericSky(texture, haze, solarDirection) {
         float sunDot = max(0.0, dot(direction, solarDirection));
         float sunHalo = pow(sunDot, 18.0);
         // Rayleigh-like blue overhead; longer paths through haze near the horizon.
-        vec3 zenith = vec3(0.105, 0.225, 0.425);
+        vec3 zenith = mix(vec3(0.105, 0.225, 0.425), vec3(0.14, 0.255, 0.43), citySkyProfile);
         vec3 dayColour = mix(zenith, hazeColour, pow(1.0 - height, 4.2));
         vec2 photoUv = vec2(atan(direction.z, direction.x) * 0.159154943 + 0.5,
                             asin(clamp(direction.y, -1.0, 1.0)) * 0.318309886 + 0.5);
@@ -175,7 +177,7 @@ function createAtmosphericSky(texture, haze, solarDirection) {
         #endif
         cloudAlpha *= smoothstep(-0.015, 0.11, direction.y) * (0.84 + cloudiness * 0.13);
         float cloudEdge = 1.0 - smoothstep(threshold + 0.005, threshold + 0.12, density);
-        vec3 cloudShade = vec3(0.255, 0.30, 0.36);
+        vec3 cloudShade = mix(vec3(0.255, 0.30, 0.36), vec3(0.37, 0.405, 0.45), citySkyProfile);
         vec3 cloudLight = mix(vec3(0.91, 0.94, 0.94), vec3(1.2, 0.65, 0.31), twilight * 0.78);
         #if SKY_DETAIL > 1
           vec3 cloudColour = mix(cloudShade, cloudLight, lightSide * 0.68 + cloudTop * 0.25);
@@ -226,6 +228,30 @@ function createAtmosphericSky(texture, haze, solarDirection) {
   return sky;
 }
 
+/** Neutral urban bounce and aerial perspective; never alters the game clock. */
+export function cityLightingValues(values = {}) {
+  values = values && typeof values === "object" ? values : {};
+  const unit = (value, fallback = 0) => {
+    const number = Number(value);
+    return Number.isFinite(number)
+      ? Math.max(0, Math.min(1, number))
+      : fallback;
+  };
+  const day = unit(values.daylight, 1),
+    clouds = unit(values.cloudiness),
+    rain = unit(values.rain),
+    twilight = unit(values.twilight),
+    night = 1 - day;
+  return {
+    environmentIntensity:
+      (0.72 * day + 0.085 * night) * (1 - clouds * 0.1) + twilight * 0.1,
+    hemisphereIntensity:
+      (0.28 + clouds * 0.065) * day + 0.095 * night + twilight * 0.025,
+    exposure: 1.0 + night * 0.105 + clouds * day * 0.055,
+    fogDensity: 0.00082 + clouds * 0.0002 + rain * 0.00048 + night * 0.00008,
+  };
+}
+
 /**
  * Photographic image-based lighting and a deliberately restrained camera look.
  * Low/medium render once. High adds contact occlusion and four-sample geometry antialiasing.
@@ -240,6 +266,8 @@ export function createVisuals(renderer, scene, camera, quality = "medium") {
     exposure: renderer.toneMappingExposure,
   };
   let currentQuality;
+  let cityProfile = false;
+  let atmosphereValues = {};
   let composer = null;
   let passes = [];
   let ready = Promise.resolve();
@@ -260,6 +288,11 @@ export function createVisuals(renderer, scene, camera, quality = "medium") {
   const duskSkyColour = new THREE.Color(0xb5a7be);
   const dayHazeColour = new THREE.Color(0xb8cbd4);
   const duskHazeColour = new THREE.Color(0xc8b6ac);
+  const citySkyColour = new THREE.Color(0xdce5e9);
+  const cityGroundColour = new THREE.Color(0xb4a68e);
+  const cityDayHazeColour = new THREE.Color(0xc4d0d5);
+  const cityDuskHazeColour = new THREE.Color(0xd0baa7);
+  const cityNightHazeColour = new THREE.Color(0x223143);
   const moonDirection = new THREE.Vector3(-0.45, 0.66, 0.6).normalize();
   const upAxis = new THREE.Vector3(0, 1, 0);
   const nightColours = {
@@ -275,6 +308,8 @@ export function createVisuals(renderer, scene, camera, quality = "medium") {
   scene.environment = reflection.texture;
   scene.environmentIntensity = 0.38;
   const haze = new THREE.Fog(0xb9cbd3, 280, 2450);
+  const cityHaze = new THREE.FogExp2(0xc4d0d5, 0.00082);
+  cityHaze.color = haze.color;
   scene.fog = haze;
   scene.background = haze.color;
   const sky = createAtmosphericSky(panorama, haze, solarDirection);
@@ -332,16 +367,22 @@ export function createVisuals(renderer, scene, camera, quality = "medium") {
       height,
       undefined,
       {
-        radius: 0.4,
-        thickness: 0.65,
+        radius: cityProfile ? 0.62 : 0.4,
+        thickness: cityProfile ? 0.3 : 0.65,
         distanceFallOff: 0.9,
         distanceExponent: 1.3,
         samples: 16,
         scale: 0.9,
       },
-      { lumaPhi: 8, depthPhi: 2.5, normalPhi: 3, radius: 5, samples: 16 },
+      {
+        lumaPhi: 8,
+        depthPhi: 2.5,
+        normalPhi: 3,
+        radius: 5,
+        samples: 16,
+      },
     );
-    occlusion.blendIntensity = 0.35;
+    occlusion.blendIntensity = cityProfile ? 0.48 : 0.35;
     // The generic normal override cannot reproduce each leaf's alpha cutout.
     // Omit those cards and glass from the AO buffer instead of darkening their
     // invisible rectangular backing; the beauty/shadow passes still draw them.
@@ -380,20 +421,21 @@ export function createVisuals(renderer, scene, camera, quality = "medium") {
     ready = Promise.resolve();
   }
 
-  function setQuality(value) {
-    const next = ["low", "medium", "high"].includes(value) ? value : "medium";
-    if (next === currentQuality) return;
-    currentQuality = next;
-    const skyDetail = next === "low" ? 1 : next === "high" ? 3 : 2;
-    if (sky.material.defines.SKY_DETAIL !== skyDetail) {
-      sky.material.defines.SKY_DETAIL = skyDetail;
-      sky.material.needsUpdate = true;
-    }
+  function configureShadows() {
+    const next = currentQuality;
     renderer.shadowMap.enabled = next !== "low";
     sun.castShadow = next !== "low";
     const requestedSize = next === "high" ? 4096 : 2048;
     const size = Math.min(requestedSize, renderer.capabilities.maxTextureSize);
-    shadowSpan = next === "high" ? 74 : 48;
+    shadowSpan = cityProfile
+      ? next === "high"
+        ? 58
+        : 44
+      : next === "high"
+        ? 74
+        : 48;
+    sun.shadow.normalBias = cityProfile ? 0.008 : 0.018;
+    sun.shadow.bias = cityProfile ? -0.000015 : -0.000025;
     sun.shadow.mapSize.set(size, size);
     Object.assign(sun.shadow.camera, {
       left: -shadowSpan,
@@ -405,11 +447,35 @@ export function createVisuals(renderer, scene, camera, quality = "medium") {
     sun.shadow.map?.dispose();
     sun.shadow.map = null;
     sun.shadow.needsUpdate = true;
+  }
+
+  function setQuality(value) {
+    const next = ["low", "medium", "high"].includes(value) ? value : "medium";
+    if (next === currentQuality) return;
+    currentQuality = next;
+    const skyDetail = next === "low" ? 1 : next === "high" ? 3 : 2;
+    if (sky.material.defines.SKY_DETAIL !== skyDetail) {
+      sky.material.defines.SKY_DETAIL = skyDetail;
+      sky.material.needsUpdate = true;
+    }
+    configureShadows();
     configurePipeline();
+  }
+
+  function setCityProfile(enabled) {
+    const next = !!enabled;
+    if (disposed || next === cityProfile) return;
+    cityProfile = next;
+    scene.fog = cityProfile ? cityHaze : haze;
+    sky.material.uniforms.citySkyProfile.value = cityProfile ? 1 : 0;
+    configureShadows();
+    configurePipeline();
+    setAtmosphere(atmosphereValues);
   }
 
   function setAtmosphere(values = {}) {
     if (disposed) return;
+    atmosphereValues = { ...values };
     const finite = (value, fallback) =>
       Number.isFinite(Number(value)) ? Number(value) : fallback;
     const day = THREE.MathUtils.clamp(finite(values.daylight ?? 1, 1), 0, 1);
@@ -492,6 +558,30 @@ export function createVisuals(renderer, scene, camera, quality = "medium") {
       .lerp(nightColours.haze, night);
     haze.near = 270 - rain * 140;
     haze.far = 2280 - rain * 1350 - clouds * 140;
+    if (cityProfile) {
+      const lighting = cityLightingValues({
+        daylight: day,
+        cloudiness: clouds,
+        rain,
+        twilight,
+      });
+      scene.environmentIntensity = lighting.environmentIntensity;
+      hemisphere.intensity = lighting.hemisphereIntensity;
+      hemisphere.color
+        .copy(citySkyColour)
+        .lerp(duskSkyColour, twilight * 0.18)
+        .lerp(nightColours.sky, night);
+      hemisphere.groundColor
+        .copy(cityGroundColour)
+        .lerp(nightColours.ground, night);
+      renderer.toneMappingExposure = lighting.exposure;
+      cityHaze.density = lighting.fogDensity;
+      haze.color
+        .copy(cityDayHazeColour)
+        .lerp(cityDuskHazeColour, twilight * 0.43)
+        .lerp(nightColours.clouds, clouds * 0.55)
+        .lerp(cityNightHazeColour, night);
+    }
     lightRight.crossVectors(upAxis, sunDirection).normalize();
     lightUp.crossVectors(sunDirection, lightRight).normalize();
   }
@@ -571,6 +661,7 @@ export function createVisuals(renderer, scene, camera, quality = "medium") {
     render,
     resize,
     setQuality,
+    setCityProfile,
     setAtmosphere,
     dispose,
     get ready() {

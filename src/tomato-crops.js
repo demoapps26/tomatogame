@@ -251,11 +251,16 @@ function buildShrubSprig(low) {
 }
 
 /** Original crop geometry; the caller keeps collision, harvest and crop layout. */
-export function createTomatoCrops({ quality = "medium", append } = {}) {
+export function createTomatoCrops({
+  quality = "medium",
+  profile = "classic",
+  append,
+} = {}) {
   if (typeof append !== "function")
     throw new TypeError("Tomato crops require the world's batching callback.");
   const low = quality === "low",
-    high = quality === "high";
+    high = quality === "high",
+    urban = profile === "urban";
   const geometries = new Set(),
     materials = new Set(),
     textures = new Set();
@@ -328,8 +333,21 @@ export function createTomatoCrops({ quality = "medium", append } = {}) {
         transformed.z += sin(cropTime * 1.05 + cropPhase) * uv.y * uv.y * 0.012;
       `,
       );
+      if (urban) {
+        shader.fragmentShader = shader.fragmentShader.replace(
+          "#include <lights_fragment_end>",
+          `#include <lights_fragment_end>
+          #if NUM_DIR_LIGHTS > 0
+            for (int leafLight = 0; leafLight < NUM_DIR_LIGHTS; leafLight++) {
+              float leafBacklight = pow(saturate(dot(-normal, directionalLights[leafLight].direction)), 2.0);
+              reflectedLight.directDiffuse += diffuseColor.rgb * directionalLights[leafLight].color * leafBacklight * 0.035;
+            }
+          #endif`,
+        );
+      }
     };
-    leafMaterial.customProgramCacheKey = () => "tomato-botanical-leaf-wind-v1";
+    leafMaterial.customProgramCacheKey = () =>
+      urban ? "urban-tomato-thin-leaf-v2" : "tomato-botanical-leaf-wind-v1";
   }
   const stats = {
     quality,
@@ -420,7 +438,9 @@ export function createTomatoCrops({ quality = "medium", append } = {}) {
       y: y * size,
       z: z + Math.cos(phase + y * 0.65) * 0.035 * size,
     });
-    const stemLevels = [0.69, 1.15, 1.65, 2.19];
+    const stemLevels = urban
+      ? [0.69, 1.15, 1.76, 2.38]
+      : [0.69, 1.15, 1.65, 2.19];
     for (let index = 0; index < stemLevels.length - 1; index++) {
       const a = stemAt(stemLevels[index]),
         b = stemAt(stemLevels[index + 1]);
@@ -462,15 +482,23 @@ export function createTomatoCrops({ quality = "medium", append } = {}) {
         caneMaterial,
       );
     }
-    const compounds = low ? 2 : high ? 5 : 4;
+    const compounds = low ? 2 : high ? (urban ? 6 : 5) : urban ? 5 : 4;
     for (let index = 0; index < compounds; index++) {
-      const y = low ? 1.18 + index * 0.6 : 0.98 + index * (high ? 0.255 : 0.31);
+      const y = low
+        ? 1.18 + index * 0.6
+        : urban
+          ? 0.98 + index * (high ? 0.255 : 0.315)
+          : 0.98 + index * (high ? 0.255 : 0.31);
       const start = stemAt(y),
         angle = phase + index * 2.39996323;
-      const reach = (0.36 + random() * 0.06) * size;
+      const reach =
+        (urban ? 0.43 + random() * 0.09 : 0.36 + random() * 0.06) * size;
       const end = {
         x: start.x + Math.sin(angle) * reach,
-        y: start.y + (index % 2 ? -0.04 : 0.075) * size,
+        y:
+          start.y +
+          (urban ? (index % 2 ? -0.11 : 0.14) : index % 2 ? -0.04 : 0.075) *
+            size,
         z: start.z + Math.cos(angle) * reach,
       };
       beam(
@@ -494,17 +522,19 @@ export function createTomatoCrops({ quality = "medium", append } = {}) {
         for (const side of [-1, 1]) {
           const leafAngle = angle + side * (0.93 + random() * 0.12);
           const length =
-            (0.195 + random() * 0.043) * (1 - index * 0.055) * size;
+            (urban ? 0.235 + random() * 0.05 : 0.195 + random() * 0.043) *
+            (1 - index * (urban ? 0.035 : 0.055)) *
+            size;
           leaflet(
             base.x,
             base.y,
             base.z,
             Math.sin(leafAngle),
-            -0.12 - random() * 0.24,
+            urban ? -0.12 - random() * 0.4 : -0.12 - random() * 0.24,
             Math.cos(leafAngle),
-            length * 0.54,
+            length * (urban ? 0.7 : 0.54),
             length,
-            (random() - 0.5) * 0.62,
+            (random() - 0.5) * (urban ? 1.42 : 0.62),
             leafColour(),
           );
         }
@@ -514,11 +544,11 @@ export function createTomatoCrops({ quality = "medium", append } = {}) {
         end.y,
         end.z,
         Math.sin(angle),
-        -0.17,
+        urban ? (index % 2 ? -0.3 : 0.12) : -0.17,
         Math.cos(angle),
-        0.117 * size,
-        0.23 * size,
-        (random() - 0.5) * 0.55,
+        (urban ? 0.18 : 0.117) * size,
+        (urban ? 0.285 : 0.23) * size,
+        (random() - 0.5) * (urban ? 1.3 : 0.55),
         leafColour(),
       );
       if (low) {

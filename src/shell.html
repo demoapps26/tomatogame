@@ -27,8 +27,8 @@
             ></a
           >
           <div class="edition">
-            <span class="status-dot"></span> UM NOVO TERRITÓRIO
-            <span class="edition-number">VOL. 09</span>
+            <span class="status-dot"></span> VIVER SANTA TOMATA
+            <span class="edition-number">VOL. 10</span>
           </div>
         </header>
         <div class="menu-content">
@@ -41,11 +41,11 @@
             </h1>
             <p id="menu-description">
               Herdaste uma estufa e uma promessa por cumprir. Funda a tua
-              empresa, cuida da colheita e negoceia com os clientes. Percorre o
-              centro, descobre os trabalhos no quadro junto à sede e faz as
-              recolhas e entregas no terreno. Investe na frota, escolhe uma casa
-              e sente as curvas ao volante, com sol ou chuva. Usa V para
-              fotografar a cidade e a tua história.
+              empresa e entra na loja da sede: recolhe a amostra, transporta as
+              caixas, pesa e sela a encomenda antes de a expedir. Percorre os
+              quarteirões de Santa Tomata, negoceia com os clientes e investe na
+              frota. Usa E para trabalhar, X para cancelar o lote e V para
+              fotografar a tua história.
             </p>
           </div>
           <div class="territory-heading">
@@ -67,7 +67,7 @@
               >
               <span class="map-info"
                 ><strong>Santa Tomata</strong
-                ><small>Bairros, negócios e uma história por escrever</small
+                ><small>Quarteirões, comércio e trabalho no terreno</small
                 ><span class="map-tag">CIDADE COSTEIRA</span></span
               >
             </button>
@@ -178,7 +178,7 @@
         <footer class="menu-footer">
           <span>PROTÓTIPO JOGÁVEL · 1 JOGADOR</span
           ><span>SEM PRESSA. SEM LIMITES PARA A IMAGINAÇÃO.</span
-          ><span class="footer-build">TOMATO REPUBLIC <i>06</i></span>
+          ><span class="footer-build">TOMATO REPUBLIC <i>10</i></span>
         </footer>
       </section>
 
@@ -244,6 +244,20 @@
           <span aria-hidden="true">▤</span
           ><span class="jobs-label">Trabalhos</span><kbd>J</kbd>
         </button>
+        <section
+          id="manual-task"
+          hidden
+          aria-label="Preparação manual do lote"
+          aria-live="polite"
+        >
+          <div>
+            <small id="manual-count">0 / 6 CAIXAS</small
+            ><strong id="manual-title">Preparar o lote</strong>
+          </div>
+          <p id="manual-detail"></p>
+          <progress id="manual-progress" value="0" max="1"></progress>
+          <button id="manual-cancel" type="button">Cancelar lote · X</button>
+        </section>
         <div class="mission-card">
           <div class="mission-heading">
             <span class="mission-icon" aria-hidden="true">↗</span
@@ -722,9 +736,9 @@
               target="_blank"
               rel="noopener"
               >MIT</a
-            >. Dois exteriores selecionados, materiais e texturas adaptados para
-            quatro edifícios do centro. Aviso MIT integral incluído neste
-            ficheiro.
+            >. Dois exteriores selecionados, materiais e texturas reutilizados
+            em 20 fachadas de 12 lotes de Santa Tomata. As 40 alas anexas e os
+            pátios são procedurais. Aviso MIT integral incluído neste ficheiro.
           </p>
           <p>
             Automóvel «CarConcept»: Eric Chadwick / Darmstadt Graphics Group
@@ -746,6 +760,16 @@
           <p>
             Poltrona «SheenChair»: Eric Chadwick / Wayfair, LLC, © 2020,
             licença CC0 1.0. Geometria e materiais adaptados para as casas.
+          </p>
+          <p>
+            Loja, embalagens, balança, mobiliário urbano e vegetação da versão
+            0.10: geometria procedural e desenho originais do jogo, com os
+            materiais já identificados acima. Etiquetas e visor desenhados
+            localmente; sem novas fontes ou bibliotecas de imagens externas.
+          </p>
+          <p>
+            Passos de interior/exterior em Santa Tomata e confirmação da
+            balança: áudio sintetizado localmente, sem gravações externas.
           </p>
           <p>
             Motor gráfico: Three.js; descompressão: fflate / Arjun Barrett,

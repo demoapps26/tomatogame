@@ -5,7 +5,12 @@ import { createVegetationLibrary } from "./vegetation.js";
 import { createCityWindowMaterial } from "./window-material.js";
 import { createUrbanDetail } from "./urban-detail.js";
 import { createTomatoCrops } from "./tomato-crops.js";
-import { createDetailedBuilding } from "./district-asset.js";
+import {
+  createCityBlocks,
+  isCityBlockSite,
+  LEGACY_CITY_ENVELOPES,
+} from "./city-blocks.js";
+import { createHeadquartersDetail } from "./headquarters-detail.js";
 
 export const MAPS = [
   {
@@ -653,6 +658,7 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
   }
   const vegetation = createVegetationLibrary({
     quality,
+    profile: city ? "urban" : "classic",
     append(g, m, transform, x, z, color, level = 0) {
       const previous = detailLevel;
       detailLevel = level;
@@ -662,6 +668,7 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
   });
   const crops = createTomatoCrops({
     quality,
+    profile: city ? "urban" : "classic",
     append(g, m, transform, x, z, color, level = 0) {
       const previous = detailLevel;
       detailLevel = level;
@@ -892,58 +899,14 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
             ? ["#c8c9bb", "#acb9b1", "#c5b79d"]
             : ["#f3e6cc", "#e0cfb4", "#d9d8c2", "#e6d6bb", "#d8c3aa"],
       );
-    // Preserve procedural RNG calls below, so routes, yards and saved positions
-    // remain stable. Only the four replaced buildings suppress their old batches.
-    const detailedSites = {
-      "-28:68": { variant: "cafe", yaw: 2.042 },
-      "-68:68": { variant: "cafe", yaw: 0.471 },
-      "-28:28": { variant: "townhouse", yaw: 3.613 },
-      "-68:28": { variant: "townhouse", yaw: 0.471 },
-    };
-    const specification =
-      city && !low && !label ? detailedSites[`${x}:${z}`] : null;
-    let detailedBounds = null;
+    // Continue every procedural RNG call below even when replacing its visual
+    // volume. Roads, yards, trees and saved positions keep their original seed.
+    const composed = city && !label && isCityBlockSite(x, z);
+    const detailedBounds = composed
+      ? LEGACY_CITY_ENVELOPES[`${x}:${z}`] || null
+      : null;
     const previousSuppression = suppressBuilding;
-    if (specification) {
-      const asset = createDetailedBuilding(specification);
-      // The source district has oblique axes. Orient the actual facades to
-      // the street, then measure their rotated geometry rather than swapping
-      // unrotated dimensions. Keep native metre scale and centre the fitted lot.
-      asset.rotation.y = specification.yaw;
-      const orientedBox = new THREE.Box3().setFromObject(asset, true);
-      const extent = orientedBox.getSize(new THREE.Vector3());
-      const centre = orientedBox.getCenter(new THREE.Vector3());
-      const scale = Math.min(
-        1,
-        (width - 0.12) / extent.x,
-        (depth - 0.12) / extent.z,
-      );
-      asset.scale.setScalar(scale);
-      asset.position.set(
-        x - centre.x * scale,
-        0.015 - orientedBox.min.y * scale,
-        z - centre.z * scale,
-      );
-      asset.name = `detailed-${specification.variant}-${x}-${z}`;
-      asset.traverse((object) => {
-        if (object.geometry) geometries.add(object.geometry);
-        for (const material of object.material
-          ? [object.material].flat()
-          : []) {
-          materials.add(material);
-          for (const value of Object.values(material))
-            if (value?.isTexture) textures.add(value);
-        }
-      });
-      group.add(asset);
-      detailedBounds = {
-        width: extent.x * scale,
-        depth: extent.z * scale,
-        height: extent.y * scale,
-      };
-      stats.detailedBuildings++;
-      suppressBuilding = true;
-    }
+    if (composed) suppressBuilding = true;
     buildingSites.push({
       x,
       z,
@@ -953,7 +916,8 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
       style,
       color,
       label,
-      ...(detailedBounds ? { ...detailedBounds, detailedAsset: true } : {}),
+      ...(detailedBounds ? { ...detailedBounds } : {}),
+      ...(composed ? { detailedAsset: true, cityBlock: true } : {}),
     });
     box(main, x, height / 2, z, width, height, depth, 0, color);
     for (const side of [-1, 1]) {
@@ -1328,7 +1292,11 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
       z,
       detailedBounds ? detailedBounds.width : width + 0.12,
       detailedBounds ? detailedBounds.depth : depth + 0.12,
-      detailedBounds ? detailedBounds.height : height + 2,
+      detailedBounds
+        ? detailedBounds.height
+        : composed
+          ? Math.max(22, height + 2)
+          : height + 2,
     );
   }
   function greenhouse(x, z, width = 24, length = 38, withPlants = true) {
@@ -1368,12 +1336,44 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
         box(mats.wood, bedX, 0.35, z, width * 0.24, 0.7, length - 4);
         box(mats.soil, bedX, 0.74, z, width * 0.22, 0.06, length - 4);
         collision(bedX, z, width * 0.24, length - 4, 2.4);
-        for (let dz = -halfLength + 3; dz < halfLength - 1; dz += low ? 4 : 2.8)
-          crop(bedX, z + dz, 1.1);
+        const dense =
+          city && ((x === 65 && z === 35) || (x === 24 && z === 144));
+        if (dense) {
+          const rows = low
+            ? [0]
+            : high && x === 65
+              ? [-1.4, 0, 1.4]
+              : [-0.8, 0.8];
+          const spacing = low ? 2.1 : high ? (x === 65 ? 1.4 : 1.6) : 1.7;
+          for (const offset of rows)
+            for (let dz = -halfLength + 3; dz < halfLength - 1; dz += spacing)
+              crop(bedX + offset, z + dz, 1.1);
+        } else {
+          for (
+            let dz = -halfLength + 3;
+            dz < halfLength - 1;
+            dz += low ? 4 : 2.8
+          )
+            crop(bedX, z + dz, 1.1);
+        }
       }
     }
-    for (const end of [-1, 1])
+    for (const end of [-1, 1]) {
+      // Tie the door header into the end frame rather than leave an isolated
+      // dark strip suspended between the two side walls.
+      if (city)
+        beam(
+          mats.steel,
+          x - side,
+          4.8,
+          z + end * halfLength,
+          x + side,
+          4.8,
+          z + end * halfLength,
+          0.065,
+        );
       box(mats.dark, x, 4.65, z + end * halfLength, 4.5, 0.45, 0.18);
+    }
   }
   function farmingBlock(x, z, width = 72, depth = 72, rows = true) {
     box(mats.soil, x, 0.025, z, width, 0.06, depth);
@@ -1921,7 +1921,7 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
     box(mats.dark, x, height - 0.2, 78, width, 0.4, 0.45);
     for (const dx of [-3.5, 3.5])
       box(mats.dark, x + dx, 2.4, 78, 0.16, 4.8, 0.4);
-    // The roof becomes a cutaway only as the player approaches the doorway.
+    // A solid roof and ceiling enclose the shop above its fluorescent fixtures.
     const roof = new THREE.Mesh(boxGeo, mats.concrete);
     roof.position.set(x, height + 0.15, z);
     roof.scale.set(width + 0.8, 0.3, depth + 0.8);
@@ -2947,6 +2947,37 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
     });
     group.add(mesh);
   }
+  const headquartersDetail = city
+    ? createHeadquartersDetail({ quality })
+    : null;
+  if (headquartersDetail) {
+    group.add(headquartersDetail.group);
+    colliders.push(...headquartersDetail.colliders);
+    interactionPoints.push(...headquartersDetail.interactionPoints);
+  }
+  const cityBlocks = city
+    ? createCityBlocks({ sites: buildingSites, quality, materials: mats })
+    : null;
+  if (cityBlocks) {
+    group.add(cityBlocks.group);
+    const pavementGeometry = geometry(new THREE.PlaneGeometry(1, 1));
+    pavementGeometry.rotateX(-Math.PI / 2);
+    pavementGeometry.userData.horizontalGroundSurface = true;
+    for (const floor of cityBlocks.floorSurfaces) {
+      const transform = new THREE.Matrix4().makeScale(
+        floor.maxX - floor.minX,
+        1,
+        floor.maxZ - floor.minZ,
+      );
+      transform.setPosition(
+        (floor.minX + floor.maxX) / 2,
+        floor.floorHeight,
+        (floor.minZ + floor.maxZ) / 2,
+      );
+      registerWalkingSurface(pavementGeometry, mats.stone, transform);
+    }
+    stats.detailedBuildings = cityBlocks.stats.detailedBuildings;
+  }
   const urbanDetail = createUrbanDetail(
     scene,
     {
@@ -3014,10 +3045,11 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
     ctx.font = (name.length > 23 ? "55" : "74") + "px Arial";
     ctx.fillText(name, 512, 98, 950);
     ctx.font = "25px Arial";
+    const teamSize = Math.max(1, Number(company.staff) || 1);
     ctx.fillText(
       "CULTIVAR O AMANHÃ · " +
-        Math.max(1, Number(company.staff) || 1) +
-        " PESSOAS",
+        teamSize +
+        (teamSize === 1 ? " PESSOA" : " PESSOAS"),
       512,
       178,
       950,
@@ -3057,15 +3089,19 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
       renderFocus.z = focus.z;
     }
     for (const roof of interiorRoofs)
-      roof.mesh.visible = !(
-        renderFocus.x > roof.minX &&
-        renderFocus.x < roof.maxX &&
-        renderFocus.z > roof.minZ &&
-        renderFocus.z < roof.maxZ
-      );
+      roof.mesh.visible =
+        city ||
+        !(
+          renderFocus.x > roof.minX &&
+          renderFocus.x < roof.maxX &&
+          renderFocus.z > roof.minZ &&
+          renderFocus.z < roof.maxZ
+        );
     mats.water.normalMap.offset.set(elapsed * 0.006, elapsed * 0.003);
     vegetation.update(elapsed);
     crops.update(elapsed);
+    cityBlocks?.update(elapsed, renderFocus);
+    headquartersDetail?.update(elapsed, renderFocus, companyLevels);
     urbanDetail.update(
       Math.max(0, Math.min(0.5, elapsed - previousDetailTime)),
       renderFocus,
@@ -3197,6 +3233,10 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
     stats,
     vegetationStats: vegetation.stats,
     cropStats: crops.stats,
+    cityBlocksStats: cityBlocks?.stats || null,
+    headquartersStats: headquartersDetail?.stats || null,
+    setManualWorkState: (view) => headquartersDetail?.setWorkState(view),
+    cityBlockFootprints: cityBlocks?.solidFootprints || [],
     urbanStats: urbanDetail.stats,
     roadStep,
     updateCompany,
@@ -3246,6 +3286,9 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
       urbanDetail.dispose();
       vegetation.dispose();
       crops.dispose();
+      cityBlocks?.dispose();
+      headquartersDetail?.dispose();
+      for (const batch of renderBatches) batch.mesh.dispose();
       for (const g of geometries) g.dispose();
       for (const m of materials) m.dispose();
       for (const t of textures) t.dispose();

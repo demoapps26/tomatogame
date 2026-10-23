@@ -25,7 +25,7 @@ function textureFromPixels(data, width, height, colour = true) {
   texture.needsUpdate = true;
   return texture;
 }
-function createBark() {
+function createBark(urban = false) {
   const width = 256,
     height = 512;
   const data = new Uint8Array(width * height * 4);
@@ -41,13 +41,17 @@ function createBark() {
       );
       const ridge = Math.sin(u * 71 + Math.sin(v * 14) * 0.75) * 0.045;
       const grain = noise(x, y, 3) * 0.055;
-      const elevation = 0.64 - fissure * 0.4 + ridge + grain;
+      const mottling = urban
+        ? Math.sin(u * 7 + Math.sin(v * 19) * 0.8) * 0.045 +
+          Math.sin(u * 13 - v * 27) * 0.026
+        : 0;
+      const elevation = 0.64 - fissure * 0.4 + ridge + grain + mottling;
       heights[y * width + x] = elevation;
       const at = (y * width + x) * 4;
       const light = 0.66 + elevation * 0.53;
-      data[at] = 125 * light;
-      data[at + 1] = 112 * light;
-      data[at + 2] = 94 * light;
+      data[at] = (urban ? 128 : 125) * light;
+      data[at + 1] = (urban ? 120 : 112) * light;
+      data[at + 2] = (urban ? 105 : 94) * light;
       data[at + 3] = 255;
     }
   }
@@ -77,10 +81,20 @@ function createBark() {
   }
   return { map, normalMap };
 }
-function createSprayTexture(species) {
+function createSprayTexture(species, urban = false) {
   const width = 512,
     height = 512;
   const pixels = new Uint8Array(width * height * 4);
+  // Keep leaf-coloured RGB outside the cutout. Transparent black texels would
+  // bleed into the visible edge of every mip and turn distant crowns sooty.
+  if (urban) {
+    const edgeColour = species === "pine" ? [73, 103, 68] : [99, 124, 73];
+    for (let at = 0; at < pixels.length; at += 4) {
+      pixels[at] = edgeColour[0];
+      pixels[at + 1] = edgeColour[1];
+      pixels[at + 2] = edgeColour[2];
+    }
+  }
   const random = generator(
     species === "olive" ? 98317 : species === "pine" ? 18983 : 71831,
   );
@@ -171,7 +185,13 @@ function createSprayTexture(species) {
     }
   };
   twig(260, 484, 246, 66, 3.2);
-  const branches = species === "pine" ? 10 : 8;
+  const branches = urban
+    ? species === "plane"
+      ? 12
+      : 14
+    : species === "pine"
+      ? 10
+      : 8;
   for (let index = 0; index < branches; index++) {
     const t = (index + 1) / (branches + 1),
       side = index % 2 ? 1 : -1;
@@ -181,7 +201,17 @@ function createSprayTexture(species) {
     const endX = startX + side * span,
       endY = startY - 54 - random() * 36;
     twig(startX, startY, endX, endY, 1.8 - t * 0.6);
-    const count = species === "pine" ? 11 : species === "olive" ? 5 : 4;
+    const count = urban
+      ? species === "pine"
+        ? 13
+        : species === "olive"
+          ? 7
+          : 5
+      : species === "pine"
+        ? 11
+        : species === "olive"
+          ? 5
+          : 4;
     for (let item = 0; item <= count; item++) {
       const at = (item + 0.35) / (count + 0.8);
       const px = startX + (endX - startX) * at,
@@ -205,9 +235,9 @@ function createSprayTexture(species) {
           px + Math.cos(angle) * size * 0.76,
           py + Math.sin(angle) * size * 0.76,
           angle,
-          size,
-          breadth,
-          species === "olive" && random() > 0.66,
+          size * (urban ? (species === "olive" ? 0.82 : 0.93) : 1),
+          breadth * (urban ? (species === "olive" ? 0.9 : 0.96) : 1),
+          species === "olive" && random() > (urban ? 0.85 : 0.66),
         );
       }
     }
@@ -238,11 +268,16 @@ function createSprayTexture(species) {
  * append(geometry, material, matrix, worldX, worldZ, color, detailLevel).
  * Each tree keeps its original ground footprint: the caller owns collisions.
  */
-export function createVegetationLibrary({ quality = "medium", append } = {}) {
+export function createVegetationLibrary({
+  quality = "medium",
+  profile = "classic",
+  append,
+} = {}) {
   if (typeof append !== "function")
     throw new TypeError("Vegetation requires the world's append callback.");
   const low = quality === "low",
-    high = quality === "high";
+    high = quality === "high",
+    urban = profile === "urban";
   const geometries = new Set(),
     materials = new Set(),
     textures = new Set();
@@ -254,7 +289,10 @@ export function createVegetationLibrary({ quality = "medium", append } = {}) {
   const trunkGeometry = ownGeometry(
     new THREE.CylinderGeometry(0.88, 1, 1, low ? 6 : 10, 1),
   );
-  const sprayGeometry = ownGeometry(new THREE.PlaneGeometry(1, 1, 2, 2));
+  const subdivisions = urban && low ? 1 : 2;
+  const sprayGeometry = ownGeometry(
+    new THREE.PlaneGeometry(1, 1, subdivisions, subdivisions),
+  );
   // A shallow bend gives each spray coherent highlights without a rigid plane.
   const points = sprayGeometry.attributes.position;
   for (let index = 0; index < points.count; index++)
@@ -264,14 +302,14 @@ export function createVegetationLibrary({ quality = "medium", append } = {}) {
         Math.abs(points.getY(index)) * 0.045,
     );
   sprayGeometry.computeVertexNormals();
-  const bark = createBark();
+  const bark = createBark(urban);
   textures.add(bark.map);
   textures.add(bark.normalMap);
   const barkMaterial = ownMaterial(
     new THREE.MeshStandardMaterial({
       color: "#d2c9b3",
       ...bark,
-      normalScale: new THREE.Vector2(0.55, 0.55),
+      normalScale: new THREE.Vector2(urban ? 0.4 : 0.55, urban ? 0.4 : 0.55),
       roughness: 0.97,
     }),
   );
@@ -279,13 +317,13 @@ export function createVegetationLibrary({ quality = "medium", append } = {}) {
   const time = { value: 0 };
   const foliage = Object.fromEntries(
     ["plane", "olive", "pine"].map((species) => {
-      const map = createSprayTexture(species);
+      const map = createSprayTexture(species, urban);
       textures.add(map);
       const material = ownMaterial(
         new THREE.MeshStandardMaterial({
           color: "#ffffff",
           map,
-          alphaTest: 0.43,
+          alphaTest: urban ? (species === "pine" ? 0.33 : 0.37) : 0.43,
           side: THREE.DoubleSide,
           roughness: 0.93,
           metalness: 0,
@@ -311,8 +349,24 @@ export function createVegetationLibrary({ quality = "medium", append } = {}) {
           transformed.z += cos(vegetationTime * 0.69 + vegetationPhase * 0.7) * uv.y * 0.018;
         `,
           );
+          if (urban) {
+            // A thin leaf scatters a small part of direct light through its
+            // reverse side. This follows the actual sun colour/intensity and
+            // disappears at night; it is deliberately not an emissive term.
+            shader.fragmentShader = shader.fragmentShader.replace(
+              "#include <lights_fragment_end>",
+              `#include <lights_fragment_end>
+              #if NUM_DIR_LIGHTS > 0
+                for (int leafLight = 0; leafLight < NUM_DIR_LIGHTS; leafLight++) {
+                  float leafBacklight = pow(saturate(dot(-normal, directionalLights[leafLight].direction)), 2.0);
+                  reflectedLight.directDiffuse += diffuseColor.rgb * directionalLights[leafLight].color * leafBacklight * 0.045;
+                }
+              #endif`,
+            );
+          }
         };
-        material.customProgramCacheKey = () => "botanical-spray-wind-v1";
+        material.customProgramCacheKey = () =>
+          urban ? "urban-canopy-thin-leaf-v2" : "botanical-spray-wind-v1";
       }
       return [species, material];
     }),
@@ -367,6 +421,181 @@ export function createVegetationLibrary({ quality = "medium", append } = {}) {
     );
     stats.sprays++;
   }
+  function addUrbanTree(x, z, size, species, random) {
+    const olive = species === "olive",
+      pine = species === "pine",
+      cypress = species === "cypress";
+    const height = (olive ? 6.4 : pine ? 8.8 : cypress ? 9.1 : 8.1) * size;
+    const trunkTop =
+      height * (olive ? 0.43 : pine ? 0.66 : cypress ? 0.83 : 0.48);
+    const leanAngle = random() * TAU;
+    const leanX = Math.sin(leanAngle) * (olive ? 0.3 : 0.18) * size,
+      leanZ = Math.cos(leanAngle) * 0.18 * size;
+    const trunkTone = new THREE.Color(
+      ["#c2bbae", "#b7b5a7", "#bcb7a7", "#aea99c"][Math.floor(random() * 4)],
+    );
+    const tints = olive
+      ? ["#a5b092", "#98a783", "#acb699", "#919f7f"]
+      : pine || cypress
+        ? ["#819b71", "#748f66", "#8ba375", "#6e875f"]
+        : ["#99ad79", "#889f69", "#a2b583", "#829762"];
+    const tint = () =>
+      new THREE.Color(tints[Math.floor(random() * tints.length)]);
+    let previous = { x, y: 0, z };
+    for (let index = 1; index <= 4; index++) {
+      const t = index / 4;
+      const next = { x: x + leanX * t * t, y: trunkTop * t, z: z + leanZ * t };
+      branch(
+        previous.x,
+        previous.y,
+        previous.z,
+        next.x,
+        next.y,
+        next.z,
+        (0.265 - t * (cypress ? 0.145 : 0.09)) * size,
+        trunkTone,
+        true,
+      );
+      previous = next;
+    }
+
+    // Branches support overlapping volumes, rather than terminating in isolated
+    // radial bunches. Their unequal centres also break the perfect ring/profile.
+    const lobes = low
+      ? cypress
+        ? 7
+        : 5
+      : high
+        ? cypress
+          ? 13
+          : 9
+        : cypress
+          ? 10
+          : 7;
+    const cards = low ? 7 : high ? 16 : 14;
+    const crownY = height * (olive ? 0.74 : pine ? 0.84 : 0.74);
+    const radius = (olive ? 2.72 : pine ? 3.1 : cypress ? 0.68 : 2.92) * size;
+    const centres = [];
+    for (let lobe = 0; lobe < lobes; lobe++) {
+      const t = (lobe + 0.4) / lobes;
+      const angle = leanAngle + lobe * 2.39996323 + (random() - 0.5) * 0.32;
+      const reach = cypress
+        ? radius * 0.16
+        : lobe === 0
+          ? radius * 0.08
+          : radius * (0.46 + random() * 0.12);
+      const centre = {
+        x: x + leanX + Math.sin(angle) * reach,
+        y: cypress
+          ? height * (0.2 + t * 0.72)
+          : crownY +
+            (random() - 0.5) * (pine ? 0.42 : 0.95) * size +
+            (lobe === 0 ? 0.48 * size : 0),
+        z: z + leanZ + Math.cos(angle) * reach,
+      };
+      const rx = cypress
+        ? radius * (0.92 - Math.pow(t, 2) * 0.67)
+        : radius * (0.4 + random() * 0.07);
+      const ry = cypress
+        ? height * 0.105
+        : (olive ? 1.12 : pine ? 0.78 : 1.43) * size;
+      const rz = rx * (0.9 + random() * 0.18);
+      centres.push({ ...centre, rx, ry, rz });
+
+      const originY = cypress
+        ? centre.y * 0.87
+        : trunkTop * (0.72 + random() * 0.23);
+      const middle = {
+        x: x + leanX + (centre.x - x - leanX) * 0.47,
+        y: originY + (centre.y - originY) * 0.64,
+        z: z + leanZ + (centre.z - z - leanZ) * 0.47,
+      };
+      branch(
+        x + leanX * 0.7,
+        originY,
+        z + leanZ * 0.7,
+        middle.x,
+        middle.y,
+        middle.z,
+        (cypress ? 0.052 : 0.115) * size,
+        trunkTone,
+      );
+      branch(
+        middle.x,
+        middle.y,
+        middle.z,
+        centre.x,
+        centre.y,
+        centre.z,
+        (cypress ? 0.03 : 0.066) * size,
+        trunkTone,
+      );
+      for (let fork = 0; fork < (low ? 1 : 2); fork++) {
+        const direction = angle + (fork ? 0.84 : -0.76);
+        branch(
+          centre.x,
+          centre.y,
+          centre.z,
+          centre.x + Math.sin(direction) * rx * 0.65,
+          centre.y + ry * (0.18 + random() * 0.28),
+          centre.z + Math.cos(direction) * rz * 0.65,
+          0.027 * size,
+          trunkTone,
+        );
+      }
+      const count = cypress ? (low ? 5 : high ? 9 : 8) : cards + (pine ? 2 : 0);
+      for (let card = 0; card < count; card++) {
+        // An irregular Fibonacci shell with some leaves inside the lobe gives
+        // depth and continuous cover from the pavement, car and balconies.
+        const normalY = 1 - (2 * (card + 0.5)) / count;
+        const horizontal = Math.sqrt(Math.max(0, 1 - normalY * normalY));
+        const direction = card * 2.39996323 + angle + random() * 0.3;
+        const nx = Math.sin(direction) * horizontal,
+          nz = Math.cos(direction) * horizontal;
+        const depth =
+          card % 4 === 0 ? 0.3 + random() * 0.25 : 0.7 + random() * 0.22;
+        const width =
+          (cypress ? 0.8 : olive ? 1.13 : pine ? 1.22 : 1.27) *
+          size *
+          (0.88 + random() * 0.24);
+        spray(
+          species,
+          centre.x + nx * rx * depth,
+          centre.y + normalY * ry * depth,
+          centre.z + nz * rz * depth,
+          width,
+          width * (cypress ? 1.22 : olive ? 1.08 : 1),
+          direction,
+          -Math.asin(normalY) * 0.75 + (random() - 0.5) * 0.45,
+          (random() - 0.5) * 1.6,
+          tint(),
+        );
+      }
+    }
+    // A few inward sprays bridge branch forks; they prevent an empty dark
+    // core without requiring a solid sphere or a second foliage material.
+    const fill = low ? 8 : 16;
+    for (let card = 0; card < fill; card++) {
+      const centre = centres[card % centres.length];
+      const direction = random() * TAU;
+      const width = (cypress ? 0.78 : 1.3) * size;
+      spray(
+        species,
+        x + (centre.x - x) * 0.58 + Math.sin(direction) * 0.3 * size,
+        centre.y + (random() - 0.5) * centre.ry,
+        z + (centre.z - z) * 0.58 + Math.cos(direction) * 0.3 * size,
+        width,
+        width * 1.08,
+        direction,
+        (random() - 0.5) * 1.7,
+        (random() - 0.5) * 1.7,
+        tint(),
+      );
+    }
+    stats.trees++;
+    stats.species[species]++;
+    return true;
+  }
   function addTree(x, z, size = 1, olive = false, variation = 0) {
     if (
       disposed ||
@@ -399,6 +628,7 @@ export function createVegetationLibrary({ quality = "medium", append } = {}) {
             : kind < 0.94
               ? "pine"
               : "cypress";
+    if (urban) return addUrbanTree(x, z, size, species, random);
     const isOlive = species === "olive",
       isPine = species === "pine",
       isCypress = species === "cypress";

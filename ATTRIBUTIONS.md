@@ -133,8 +133,11 @@ Lumberyard Bistro**, distributed in **NVIDIA GameWorks RTXDI assets** under the
   Creative Commons license for the ORCA release.
 - Selection: Paris Building 01's main structure, ground floor, balconies and
   awnings form the `cafe` variant; Paris Building 8 02 forms `townhouse`.
-  The game places four exterior buildings near the headquarters in medium/high
-  image quality. These shells have no visitable interior.
+  Version 0.10 reuses these two variants for 20 detailed street facades across
+  12 central Santa Tomata lots in medium/high image quality. The 40 attached
+  wings and paved courtyards are additional procedural geometry. Distant and
+  low-quality versions use lighter generated volumes. The Bistro shells have
+  no visitable interior.
 - Adaptation: original ancestor transforms are baked; each building is centered
   and grounded. Original topology, smooth normals, UVs and tangent handedness
   are retained, with 16-bit runtime attribute storage and gzip compression.
@@ -175,3 +178,25 @@ CC0 release and these right holders.
   source archive hash and file hashes are retained in `assets/human-v9/`.
   `scripts/export-human-asset.py` and `scripts/pack-human-asset.mjs` reproduce the
   data using Blender and MPFB, as documented in `assets/human-v9/README.md`.
+
+## Version 0.10 shop and street additions
+
+The headquarters storefront, awning structure, refrigerator, shelving, packing
+bench, scale, cartons, reusable crates and trolleys in
+`src/headquarters-detail.js` are original procedural geometry. Product labels,
+shop plates and the physical scale display are drawn locally with Canvas and
+system fonts; no external font or new texture library is downloaded.
+
+The fitting reuses the existing ambientCG CC0 concrete, wood and fabric maps
+listed above. The new city wings, courtyards, street furniture, bicycles and
+vegetation likewise use generated geometry and the retained material sources.
+Parked vehicles reuse the game's existing passenger models; their detailed
+CarConcept variant retains its separate CC BY 4.0 terms.
+
+Santa Tomata's interior/exterior footsteps are generated from a local noise
+buffer with Web Audio filtering. The scale confirmation uses a synthesized
+oscillator tone. These additions use no third-party audio recordings or samples.
+
+No additional third-party asset source or licence is introduced by these
+version 0.10 additions. The existing Bistro MIT, MakeHuman CC0, CarConcept
+CC BY 4.0, SheenChair CC0 and legacy head-scan CC BY 3.0 notices remain in force.

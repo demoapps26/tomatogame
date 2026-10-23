@@ -317,12 +317,20 @@ export function createDetailedHuman({
   let drivingPose = false,
     gaitPhase = (Math.abs(index) * 0.83) % TAU,
     locomotionSpeed = 0,
-    aimWeight = 0;
+    aimWeight = 0,
+    carryTarget = 0,
+    carryWeight = 0;
+  // The caller owns the carried object and movement restriction. Blend only
+  // the anatomical arms/torso, so footsteps and the caller's transform survive.
+  function setCarryPose(enabled = false, weight = 1) {
+    carryTarget = enabled === true ? clamp(finite(weight, 1), 0, 1) : 0;
+  }
   function setDrivingPose(steering = 0) {
     const turn = clamp(finite(steering), -0.7, 0.7);
     drivingPose = true;
     locomotionSpeed = 0;
     aimWeight = 0;
+    carryWeight = 0;
     rig.position.set(0, 0, 0);
     rig.rotation.set(0, 0, 0);
     for (const joint of wrappers) {
@@ -371,6 +379,9 @@ export function createDetailedHuman({
     const damp = (current, target, blend = lowerBlend) =>
       THREE.MathUtils.lerp(current, target, blend);
     aimWeight = damp(aimWeight, aiming ? 1 : 0, 1 - Math.exp(-step * 11));
+    carryWeight = damp(carryWeight, carryTarget, 1 - Math.exp(-step * 10));
+    const held = (relaxed, loaded) =>
+      THREE.MathUtils.lerp(relaxed, loaded, carryWeight);
     const motion = Math.sqrt(clamp(locomotionSpeed / 3.8, 0, 1)),
       running = THREE.MathUtils.smoothstep(locomotionSpeed, 4.2, 6.8),
       idle = 1 - motion;
@@ -401,32 +412,41 @@ export function createDetailedHuman({
         -wave * THREE.MathUtils.lerp(0.3, 0.55, running) * motion;
       arms[i].rotation.x = damp(
         arms[i].rotation.x,
-        THREE.MathUtils.lerp(armSwing, i === 1 ? -1.25 : -0.18, aimWeight),
+        held(
+          THREE.MathUtils.lerp(armSwing, i === 1 ? -1.25 : -0.18, aimWeight),
+          -0.55 - wave * 0.018 * motion,
+        ),
         upperBlend,
       );
       arms[i].rotation.z = damp(
         arms[i].rotation.z,
-        side * (-0.016 - running * 0.035) + side * aimWeight * 0.035,
+        held(
+          side * (-0.016 - running * 0.035) + side * aimWeight * 0.035,
+          side * 0.08,
+        ),
         upperBlend,
       );
       arms[i].rotation.y = damp(
         arms[i].rotation.y,
-        side * (0.015 * wave * motion + 0.055 * running),
+        held(side * (0.015 * wave * motion + 0.055 * running), side * -0.025),
         upperBlend,
       );
       elbows[i].rotation.x = damp(
         elbows[i].rotation.x,
-        THREE.MathUtils.lerp(
-          -0.12 - running * 0.87 - Math.abs(wave) * 0.1 * motion,
-          i === 1 ? -0.5 : -0.32,
-          aimWeight,
+        held(
+          THREE.MathUtils.lerp(
+            -0.12 - running * 0.87 - Math.abs(wave) * 0.1 * motion,
+            i === 1 ? -0.5 : -0.32,
+            aimWeight,
+          ),
+          -0.7,
         ),
         upperBlend,
       );
       hands[i].rotation.set(
-        -0.025 * motion,
-        side * 0.025 * wave * motion,
-        side * 0.018 * motion,
+        held(-0.025 * motion, 0.15),
+        held(side * 0.025 * wave * motion, side * 1.2),
+        held(side * 0.018 * motion, side * -0.035),
       );
     }
     joints.pelvis.rotation.y = damp(
@@ -443,7 +463,11 @@ export function createDetailedHuman({
     const acceleration = step
       ? clamp((locomotionSpeed - priorSpeed) / step, -10, 10)
       : 0;
-    const lean = 0.055 * motion + 0.045 * running + acceleration * 0.003;
+    const lean =
+      0.055 * motion +
+      0.045 * running +
+      acceleration * 0.003 +
+      carryWeight * 0.022;
     joints.spine_01.rotation.x = damp(
       joints.spine_01.rotation.x,
       lean,
@@ -451,7 +475,11 @@ export function createDetailedHuman({
     );
     joints.spine_03.rotation.y = damp(
       joints.spine_03.rotation.y,
-      -Math.sin(gaitPhase) * 0.06 * motion * (1 - aimWeight * 0.7),
+      -Math.sin(gaitPhase) *
+        0.06 *
+        motion *
+        (1 - aimWeight * 0.7) *
+        (1 - carryWeight * 0.8),
       upperBlend,
     );
     joints.spine_03.rotation.z = damp(
@@ -495,5 +523,5 @@ export function createDetailedHuman({
   }
   // The original soles sit on y=0. Start in a grounded, relaxed neutral pose.
   animate(0, 0, 0, false);
-  return { group, animate, setDrivingPose };
+  return { group, animate, setDrivingPose, setCarryPose };
 }

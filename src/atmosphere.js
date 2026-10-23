@@ -121,6 +121,8 @@ export function createAtmosphere(
   visuals,
   { savedState, quality = "medium" } = {},
 ) {
+  const cityProfile = world.group?.name === "world-cidade";
+  visuals.setCityProfile?.(cityProfile);
   let state = normalizeAtmosphereState(savedState),
     disposed = false,
     active = false;
@@ -545,6 +547,7 @@ export function createAtmosphere(
       rain: 0,
       elapsed: 0,
     });
+    if (cityProfile) visuals.setCityProfile?.(false);
   }
   apply();
   updateLights(0, lastPlayer, null);
