@@ -204,9 +204,10 @@ export function createAtmosphere(
       materials.add(material);
   });
   const isWindow = (material) =>
-    material.isMeshPhysicalMaterial &&
-    material.roughness === 0.12 &&
-    material.metalness === 0.13;
+    material.userData?.cityWindow ||
+    (material.isMeshPhysicalMaterial &&
+      material.roughness === 0.12 &&
+      material.metalness === 0.13);
   const isLamp = (material) =>
     material.emissiveIntensity > 0 && material.emissive?.getHex() > 0;
   const changes = [...materials]
@@ -278,7 +279,9 @@ export function createAtmosphere(
       else if (change.kind === "lamp")
         change.material.emissiveIntensity =
           change.emissiveIntensity + night * 2.3;
-      else {
+      else if (change.material.userData?.cityWindow) {
+        change.material.userData.nightUniform.value = night;
+      } else {
         change.material.emissive.copy(change.emissive).lerp(windowLight, night);
         change.material.emissiveIntensity = THREE.MathUtils.lerp(
           change.emissiveIntensity,
@@ -519,6 +522,8 @@ export function createAtmosphere(
     releaseAudio();
     for (const change of changes) {
       change.material.roughness = change.roughness;
+      if (change.material.userData?.cityWindow)
+        change.material.userData.nightUniform.value = 0;
       if (change.emissive) change.material.emissive.copy(change.emissive);
       change.material.emissiveIntensity = change.emissiveIntensity;
     }

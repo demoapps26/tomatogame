@@ -1,6 +1,6 @@
 {
   "name": "tomato-republic",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "type": "module",
   "private": true,
   "description": "An entrepreneurial open-world tomato game with a living city, visitable shop and greenhouse, customer negotiations and autonomous deliveries",

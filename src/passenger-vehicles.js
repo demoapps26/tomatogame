@@ -3,6 +3,7 @@ import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.j
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { createVehicle } from "./actors.js";
 import { createPhotoTextures } from "./photo-assets.js";
+import { createDetailedSportVehicle } from "./vehicle-asset.js";
 
 /** Model geometry metadata. Purchase prices and driving stats live in ownership.js. */
 export const PASSENGER_MODELS = Object.freeze({
@@ -407,6 +408,7 @@ export function createPassengerVehicle(modelId = "compact", color) {
   const metadata = PASSENGER_MODELS[modelId];
   const selectedColor =
     color === undefined || color === null ? metadata.color : color;
+  if (modelId === "sport") return createDetailedSportVehicle(selectedColor);
   if (modelId === "pickup") {
     const pickup = createVehicle(selectedColor);
     pickup.modelId = modelId;

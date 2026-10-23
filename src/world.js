@@ -1,6 +1,9 @@
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { applyPhotographicMaterial } from "./material-library.js";
+import { createVegetationLibrary } from "./vegetation.js";
+import { createCityWindowMaterial } from "./window-material.js";
+import { createUrbanDetail } from "./urban-detail.js";
 
 export const MAPS = [
   {
@@ -49,7 +52,8 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
     businessLocations = [],
     interactionPoints = [],
     interiorZones = [],
-    interiorRoofs = [];
+    interiorRoofs = [],
+    buildingSites = [];
   const locationSigns = new Map();
   const geometries = new Set(),
     materials = new Set(),
@@ -318,14 +322,7 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
     tomato: material({ color: "#be432a", roughness: 0.4 }),
     white: material({ color: "#e8e7d9", roughness: 0.77 }),
     ochre: material({ color: "#c99d49", roughness: 0.77, metalness: 0.13 }),
-    window: physical({
-      color: "#91a6aa",
-      roughness: 0.12,
-      metalness: 0.13,
-      clearcoat: 0.8,
-      clearcoatRoughness: 0.11,
-      envMapIntensity: 1.2,
-    }),
+    window: createCityWindowMaterial(quality),
     glass: physical({
       color: "#a3c8ba",
       transparent: true,
@@ -357,6 +354,7 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
     trim: material({ color: "#8b8d82", roughness: 0.74, metalness: 0.08 }),
     floor: material({ color: "#e2ddd0", roughness: 0.67 }),
   };
+  materials.add(mats.window);
   // Alpha-tested leaf clusters give crowns a broken natural silhouette instead
   // of solid low-poly balls. One atlas and a handful of cards are shared by all
   // trees; near/far spatial culling remains the same as other foliage.
@@ -491,9 +489,9 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
   facadeContext.fillRect(61, 34, 134, 183);
   facadeContext.fillStyle = "#33494b";
   facadeContext.fillRect(68, 41, 120, 164);
-  facadeContext.fillStyle = "#789393";
+  facadeContext.fillStyle = "#33464e";
   facadeContext.fillRect(72, 45, 49, 72);
-  facadeContext.fillStyle = "#536e70";
+  facadeContext.fillStyle = "#263940";
   facadeContext.fillRect(131, 45, 52, 72);
   facadeContext.fillStyle = "#b6beb2";
   facadeContext.fillRect(125, 43, 4, 160);
@@ -542,6 +540,15 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
       batches.set(key, { g, m, items: [], companyPhase, detailLevel });
     batches.get(key).items.push({ matrix: matrix.clone(), color });
   }
+  const vegetation = createVegetationLibrary({
+    quality,
+    append(g, m, transform, x, z, color, level = 0) {
+      const previous = detailLevel;
+      detailLevel = level;
+      append(g, m, transform, x, z, color);
+      detailLevel = previous;
+    },
+  });
   function instance(
     g,
     m,
@@ -660,66 +667,9 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
     return object;
   }
   function tree(x, z, size = 1, olive = false) {
-    cyl(mats.wood, x, 2.05 * size, z, 0.2 * size, 4.1 * size);
-    beam(
-      mats.wood,
-      x,
-      2.5 * size,
-      z,
-      x + 1.05 * size,
-      4.3 * size,
-      z - 0.7 * size,
-      0.11 * size,
-    );
-    beam(
-      mats.wood,
-      x,
-      2.8 * size,
-      z,
-      x - 1.0 * size,
-      4.5 * size,
-      z + 0.65 * size,
-      0.12 * size,
-    );
-    const tone = olive
-      ? choose(["#6a7957", "#7c8667", "#596e4c"])
-      : choose(["#53734c", "#718452", "#5f7746"]);
-    detailLevel = 2;
-    for (const [dx, dy, dz, sx, sy] of [
-      [0, 5.3, 0, 5.6, olive ? 3.8 : 5.6],
-      [1.15, 4.7, -0.75, 4.1, 3.5],
-      [-1.05, 4.8, 0.7, 4.2, 3.6],
-    ]) {
-      for (const yaw of [0, Math.PI / 3, (Math.PI * 2) / 3])
-        instance(
-          leafCardGeo,
-          mats.foliage,
-          x + dx * size,
-          dy * size,
-          z + dz * size,
-          sx * size,
-          sy * size,
-          1,
-          yaw,
-          tone,
-          0,
-          (dx + dz) * 0.15,
-        );
-      instance(
-        leafCardGeo,
-        mats.foliage,
-        x + dx * size,
-        (dy + 0.4) * size,
-        z + dz * size,
-        sx * size,
-        sx * size,
-        1,
-        dx,
-        tone,
-        -Math.PI / 2,
-      );
-    }
-    detailLevel = 0;
+    // Preserve the previous generator's one random draw per tree so every old
+    // saved location and later building remains at exactly the same position.
+    vegetation.addTree(x, z, size, olive, random());
     collision(x, z, 0.6 * size, 0.6 * size, 5 * size);
   }
   function lamp(x, z, yaw = 0) {
@@ -888,6 +838,7 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
             ? ["#c8c9bb", "#acb9b1", "#c5b79d"]
             : ["#f3e6cc", "#e0cfb4", "#d9d8c2", "#e6d6bb", "#d8c3aa"],
       );
+    buildingSites.push({ x, z, width, depth, height, style, color, label });
     box(main, x, height / 2, z, width, height, depth, 0, color);
     for (const side of [-1, 1]) {
       instance(
@@ -2873,6 +2824,24 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
     });
     group.add(mesh);
   }
+  const urbanDetail = createUrbanDetail(
+    scene,
+    {
+      mapId: config.id,
+      id: config.id,
+      bounds,
+      roads,
+      colliders,
+      buildingSites,
+      businessLocations,
+      interactionPoints,
+      spawn: { x: 0, z: 86 },
+    },
+    quality,
+  );
+  group.add(urbanDetail.group);
+  urbanDetail.update(0.31, renderFocus);
+  let previousDetailTime = 0;
   const allColliders = colliders.slice();
   let companyLayout = "";
   function updateCompany(company = {}) {
@@ -2971,6 +2940,12 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
         renderFocus.z < roof.maxZ
       );
     mats.water.normalMap.offset.set(elapsed * 0.006, elapsed * 0.003);
+    vegetation.update(elapsed);
+    urbanDetail.update(
+      Math.max(0, Math.min(0.5, elapsed - previousDetailTime)),
+      renderFocus,
+    );
+    previousDetailTime = elapsed;
     const windowRange = low ? 160 : high ? 360 : 250,
       treeRange = low ? 260 : high ? 600 : 440;
     for (const batch of renderBatches) {
@@ -3085,6 +3060,7 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
     interactionPoints,
     interiorZones,
     estatesSites,
+    buildingSites,
     fleetSpawns: [
       { x: 18, z: 106, yaw: Math.PI },
       { x: 28, z: 106, yaw: Math.PI },
@@ -3094,6 +3070,8 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
     trafficRoutes,
     pedestrianRoutes,
     stats,
+    vegetationStats: vegetation.stats,
+    urbanStats: urbanDetail.stats,
     roadStep,
     updateCompany,
     navigationCellSize: city ? 6 : 4,
@@ -3138,6 +3116,8 @@ export function buildWorld(scene, mapId = "cidade", quality = "medium") {
     update: updateScene,
     dispose() {
       group.removeFromParent();
+      urbanDetail.dispose();
+      vegetation.dispose();
       for (const g of geometries) g.dispose();
       for (const m of materials) m.dispose();
       for (const t of textures) t.dispose();

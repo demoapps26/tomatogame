@@ -5,6 +5,7 @@ import {
   createPassengerVehicle,
   PASSENGER_MODELS,
 } from "./passenger-vehicles.js";
+import { createDetailedChair } from "./furniture-asset.js";
 
 const HOME_DATA = {
   apartamento: {
@@ -66,6 +67,11 @@ export function createEstates(scene, world, quality = "medium") {
   const sphereGeometry = geo(
     new THREE.SphereGeometry(1, low ? 8 : 12, low ? 5 : 8),
   );
+  const shadeGeometry = geo(
+    new THREE.CylinderGeometry(0.48, 1, 1, low ? 12 : 20, 1, true),
+  );
+  const railGeometry = geo(cylinderGeometry.clone().rotateX(Math.PI / 2));
+  const pictureGeometry = geo(new THREE.PlaneGeometry(1, 1));
   // Visible from inside only; a camera above it still gets the roof cutaway.
   const ceilingGeometry = geo(
     new THREE.PlaneGeometry(1, 1).rotateX(Math.PI / 2),
@@ -108,8 +114,37 @@ export function createEstates(scene, world, quality = "medium") {
       color: "#806d56",
     }),
     cloth: photo("cloth", { meters: 1, normalStrength: 0.2, color: "#a2aa93" }),
+    linen: photo("cloth", {
+      meters: 0.8,
+      normalStrength: 0.23,
+      color: "#e2dac9",
+      roughness: 0.96,
+    }),
+    accent: photo("cloth", {
+      meters: 0.85,
+      normalStrength: 0.2,
+      color: "#aa795f",
+      roughness: 0.92,
+    }),
+    rug: photo("cloth", {
+      meters: 0.75,
+      normalStrength: 0.3,
+      color: "#acb1a1",
+      roughness: 1,
+    }),
+    oak: photo("wood", {
+      meters: 2.1,
+      normalStrength: 0.15,
+      color: "#d4c5aa",
+      roughness: 0.96,
+    }),
     cream: mat({ color: "#ddd7c7", roughness: 0.86 }),
-    ceiling: mat({ color: "#e6e1d3", roughness: 0.94 }),
+    ceiling: mat({
+      color: "#e6e1d3",
+      roughness: 0.94,
+      emissive: "#d6d0bd",
+      emissiveIntensity: 0.27,
+    }),
     white: mat({ color: "#eee9db", roughness: 0.75 }),
     metal: mat({ color: "#5e6965", metalness: 0.68, roughness: 0.4 }),
     dark: mat({ color: "#263c34", roughness: 0.75 }),
@@ -136,6 +171,54 @@ export function createEstates(scene, world, quality = "medium") {
       side: THREE.DoubleSide,
     }),
   };
+  // Oiled interior timber is matte. Multiplying its scan's roughness map into
+  // a second low value made large floors mirror the blue sky like polished metal.
+  m.oak.roughnessMap = null;
+  m.ceiling.userData.indirectPaint = true;
+
+  // Original framed prints, deliberately drawn as wall art rather than used as
+  // replacement surface photography. The same two small canvases serve every home.
+  function landscapePrint(warm = false) {
+    const canvas = document.createElement("canvas");
+    canvas.width = 512;
+    canvas.height = 288;
+    const context = canvas.getContext("2d");
+    const sky = context.createLinearGradient(0, 0, 0, 220);
+    if (sky?.addColorStop) {
+      sky.addColorStop(0, warm ? "#bdbaaa" : "#98acb4");
+      sky.addColorStop(1, "#e1d4b9");
+    }
+    context.fillStyle = sky || "#b7c3c1";
+    context.fillRect(0, 0, 512, 288);
+    context.fillStyle = warm ? "#c5ad7d" : "#dcceaa";
+    context.beginPath();
+    context.arc(385, 76, 24, 0, Math.PI * 2);
+    context.fill();
+    for (let layer = 0; layer < 4; layer++) {
+      context.fillStyle = warm
+        ? ["#929a87", "#748575", "#596e5d", "#364e42"][layer]
+        : ["#859c9e", "#6d8d92", "#567c82", "#3e666d"][layer];
+      context.beginPath();
+      context.moveTo(0, 288);
+      for (let x = 0; x <= 512; x += 8)
+        context.lineTo(
+          x,
+          143 +
+            layer * 30 +
+            Math.sin(x * 0.011 + layer * 1.8) * 27 +
+            Math.sin(x * 0.025 + layer) * 10,
+        );
+      context.lineTo(512, 288);
+      context.closePath();
+      context.fill();
+    }
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.anisotropy = 4;
+    textures.add(texture);
+    return mat({ map: texture, color: "#e8e3d7", roughness: 0.94 });
+  }
+  const artMaterials = [landscapePrint(), landscapePrint(true)];
 
   const placement = new THREE.Object3D();
   function instance(parent, geometry, material, x, y, z, sx, sy, sz, yaw = 0) {
@@ -313,14 +396,41 @@ export function createEstates(scene, world, quality = "medium") {
   }
   function sofa(site, x, z, width = 2.8) {
     const parent = site.detail;
-    box(parent, m.cloth, x, 0.43, z, width, 0.42, 1, 0, true);
-    box(parent, m.cloth, x, 0.82, z - 0.4, width, 0.9, 0.18, 0, true);
+    box(parent, m.darkWood, x, 0.31, z, width - 0.1, 0.32, 0.9, 0, true);
+    box(parent, m.cloth, x, 0.75, z - 0.4, width, 0.8, 0.19, 0, true);
+    for (let seat = 0; seat < 3; seat++) {
+      const sx = x + ((seat - 1) * (width - 0.42)) / 3;
+      box(
+        parent,
+        m.cloth,
+        sx,
+        0.49,
+        z + 0.04,
+        (width - 0.5) / 3,
+        0.17,
+        0.79,
+        0,
+        true,
+      );
+      box(
+        parent,
+        m.cloth,
+        sx,
+        0.81,
+        z - 0.28,
+        (width - 0.53) / 3,
+        0.5,
+        0.15,
+        0,
+        true,
+      );
+    }
     for (const side of [-1, 1])
       box(
         parent,
         m.cloth,
         x + side * (width / 2 - 0.1),
-        0.65,
+        0.62,
         z,
         0.2,
         0.64,
@@ -328,22 +438,73 @@ export function createEstates(scene, world, quality = "medium") {
         0,
         true,
       );
+    box(
+      parent,
+      m.accent,
+      x - width * 0.29,
+      0.75,
+      z + 0.1,
+      0.39,
+      0.36,
+      0.17,
+      -0.14,
+      true,
+    );
+    box(
+      parent,
+      m.linen,
+      x + width * 0.28,
+      0.75,
+      z + 0.1,
+      0.38,
+      0.35,
+      0.17,
+      0.12,
+      true,
+    );
+    // A folded throw over the arm and separate seat cushions avoid one large
+    // inflated block while staying inside the sofa's existing footprint.
+    box(
+      parent,
+      m.linen,
+      x + width / 2 - 0.22,
+      0.96,
+      z + 0.05,
+      0.35,
+      0.055,
+      0.7,
+      0,
+      true,
+    );
     for (const dx of [-width / 2 + 0.25, width / 2 - 0.25])
       for (const dz of [-0.32, 0.32])
         cylinder(parent, m.darkWood, x + dx, 0.15, z + dz, 0.055, 0.3);
     collider(site, x, z, width, 1.15, 1.2);
   }
   function bed(site, x, z) {
-    box(site.detail, m.darkWood, x, 0.28, z, 1.95, 0.45, 2.25, 0, true);
-    box(site.detail, m.white, x, 0.59, z, 1.82, 0.26, 2.12, 0, true);
-    box(site.detail, m.cloth, x, 0.74, z + 0.18, 1.84, 0.05, 1.7, 0, true);
-    box(site.detail, m.darkWood, x, 0.72, z - 1.1, 2.05, 1.15, 0.12, 0, true);
+    box(site.detail, m.darkWood, x, 0.23, z, 1.95, 0.34, 2.25, 0, true);
+    box(site.detail, m.white, x, 0.49, z, 1.82, 0.25, 2.12, 0, true);
+    box(site.detail, m.linen, x, 0.64, z + 0.18, 1.84, 0.07, 1.7, 0, true);
+    box(site.detail, m.accent, x, 0.69, z + 0.73, 1.85, 0.055, 0.45, 0, true);
+    box(site.detail, m.oak, x, 1.42, z - 1.1, 2.05, 2.7, 0.12, 0, true);
+    for (let slat = -4; slat <= 4; slat++)
+      box(
+        site.detail,
+        m.darkWood,
+        x + slat * 0.21,
+        1.44,
+        z - 1.02,
+        0.018,
+        2.55,
+        0.018,
+      );
+    box(site.detail, m.cloth, x, 0.93, z - 0.95, 1.9, 0.75, 0.13, 0, true);
     for (const dx of [-0.47, 0.47])
       box(
         site.detail,
         m.white,
         x + dx,
-        0.82,
+        0.72,
         z - 0.76,
         0.7,
         0.15,
@@ -351,6 +512,29 @@ export function createEstates(scene, world, quality = "medium") {
         0,
         true,
       );
+    for (const side of [-1, 1]) {
+      cylinder(
+        site.detail,
+        m.brass,
+        x + side * 0.78,
+        1.76,
+        z - 0.97,
+        0.07,
+        0.09,
+      );
+      box(
+        site.detail,
+        m.light,
+        x + side * 0.78,
+        1.73,
+        z - 0.91,
+        0.1,
+        0.05,
+        0.1,
+        0,
+        true,
+      );
+    }
     collider(site, x, z, 2.05, 2.4, 1.3);
   }
   function kitchen(site, x, z, length = 4) {
@@ -409,9 +593,530 @@ export function createEstates(scene, world, quality = "medium") {
         0.03,
       );
     }
+    // Familiar appliance details and a used counter make the kitchen read at
+    // human scale; everything sits on the already collidable cabinets.
+    const hobX = x + length * 0.23;
+    box(site.detail, m.metal, hobX, 0.54, z + 0.38, 0.7, 0.59, 0.035, 0, true);
+    box(
+      site.detail,
+      m.screen,
+      hobX,
+      0.52,
+      z + 0.405,
+      0.54,
+      0.34,
+      0.025,
+      0,
+      true,
+    );
+    box(site.detail, m.brass, hobX, 0.78, z + 0.43, 0.48, 0.028, 0.035);
+    for (const knob of [-0.22, -0.07, 0.07, 0.22])
+      box(
+        site.detail,
+        m.dark,
+        hobX + knob,
+        0.81,
+        z + 0.412,
+        0.045,
+        0.04,
+        0.04,
+        0,
+        true,
+      );
+    box(site.detail, m.metal, hobX, 2.13, z + 0.08, 0.8, 0.15, 0.67, 0, true);
+    box(site.detail, m.metal, hobX, 2.47, z - 0.11, 0.31, 0.6, 0.26);
+    box(site.detail, m.light, hobX, 2.04, z + 0.16, 0.58, 0.018, 0.07);
+    const fridgeX = x + length / 2 + 0.6;
+    box(
+      site.detail,
+      m.metal,
+      fridgeX - 0.23,
+      1.24,
+      z + 0.38,
+      0.025,
+      0.59,
+      0.035,
+    );
+    box(site.detail, m.metal, fridgeX, 0.63, z + 0.374, 0.67, 0.012, 0.025);
+    box(
+      site.detail,
+      m.wood,
+      x + 0.02,
+      1.055,
+      z + 0.02,
+      0.42,
+      0.025,
+      0.32,
+      0.12,
+      true,
+    );
+    for (const dx of [-0.09, 0.08])
+      instance(
+        site.detail,
+        sphereGeometry,
+        m.red,
+        x + dx,
+        1.12,
+        z + 0.01,
+        0.065,
+        0.057,
+        0.065,
+      );
+    cylinder(
+      site.detail,
+      m.cream,
+      x - length / 2 + 0.28,
+      1.17,
+      z - 0.02,
+      0.1,
+      0.25,
+    );
+    cylinder(
+      site.detail,
+      m.darkWood,
+      x - length / 2 + 0.28,
+      1.31,
+      z - 0.02,
+      0.11,
+      0.035,
+    );
+    cylinder(site.detail, m.white, x - 0.33, 1.14, z + 0.17, 0.067, 0.15);
+    cylinder(site.detail, m.dark, x - 0.33, 1.22, z + 0.17, 0.05, 0.008);
+    box(
+      site.detail,
+      m.white,
+      x - 0.25,
+      1.15,
+      z + 0.17,
+      0.035,
+      0.075,
+      0.07,
+      0,
+      true,
+    );
     collider(site, x, z, length + 0.12, 0.85, 1.1);
     collider(site, x + length / 2 + 0.6, z, 0.8, 0.8, 2.1);
   }
+
+  function picture(parent, x, y, z, width, height, art = 0, yaw = 0) {
+    box(parent, m.darkWood, x, y, z, width + 0.13, height + 0.13, 0.075, yaw);
+    box(
+      parent,
+      m.cream,
+      x + Math.sin(yaw) * 0.045,
+      y,
+      z + Math.cos(yaw) * 0.045,
+      width,
+      height,
+      0.025,
+      yaw,
+    );
+    instance(
+      parent,
+      pictureGeometry,
+      artMaterials[art % 2],
+      x + Math.sin(yaw) * 0.06,
+      y,
+      z + Math.cos(yaw) * 0.06,
+      width - 0.12,
+      height - 0.12,
+      1,
+      yaw,
+    );
+  }
+
+  function rug(parent, x, z, width, depth, decorated = false) {
+    box(parent, m.rug, x, 0.095, z, width, 0.018, depth);
+    for (const edge of [-1, 1]) {
+      box(
+        parent,
+        m.linen,
+        x,
+        0.107,
+        z + edge * (depth / 2 - 0.1),
+        width - 0.1,
+        0.006,
+        0.08,
+      );
+      if (decorated) {
+        box(
+          parent,
+          m.accent,
+          x + edge * (width / 2 - 0.18),
+          0.108,
+          z,
+          0.06,
+          0.006,
+          depth - 0.3,
+        );
+        for (const band of [-0.15, 0.15])
+          box(
+            parent,
+            m.linen,
+            x,
+            0.108,
+            z + edge * (depth / 2 - 0.28) + band,
+            width - 0.5,
+            0.006,
+            0.023,
+          );
+      }
+    }
+  }
+
+  function pendant(parent, x, z, height, scale = 1) {
+    cylinder(parent, m.dark, x, height - 0.08, z, 0.12, 0.055);
+    cylinder(parent, m.dark, x, height - 0.38, z, 0.012, 0.56);
+    instance(
+      parent,
+      shadeGeometry,
+      m.cream,
+      x,
+      height - 0.71,
+      z,
+      0.28 * scale,
+      0.25 * scale,
+      0.28 * scale,
+    );
+    cylinder(parent, m.light, x, height - 0.84, z, 0.21 * scale, 0.02);
+  }
+
+  function loungeChair(site, x, z, yaw) {
+    const root = new THREE.Group();
+    root.name = "basic-lounge-chair";
+    root.position.set(x, 0, z);
+    root.rotation.y = yaw;
+    site.detail.add(root);
+    box(root, m.darkWood, 0, 0.26, 0, 0.82, 0.25, 0.68, 0, true);
+    box(root, m.cloth, 0, 0.43, 0.03, 0.72, 0.16, 0.65, 0, true);
+    box(root, m.cloth, 0, 0.57, -0.27, 0.83, 0.43, 0.16, 0, true);
+    for (const side of [-1, 1]) {
+      box(root, m.cloth, side * 0.4, 0.48, 0.015, 0.13, 0.34, 0.77, 0, true);
+      for (const dz of [-0.24, 0.24])
+        cylinder(root, m.darkWood, side * 0.33, 0.17, dz, 0.035, 0.2);
+    }
+    box(root, m.accent, 0.12, 0.59, -0.055, 0.27, 0.25, 0.13, 0.15, true);
+    site.basicChair = root;
+    site.chairPose = { x, z, yaw, y: 0.08 };
+    // Both the basic seat and the detailed comfort upgrade share this small
+    // permanent footprint. It is outside the clear central circulation lane.
+    collider(site, x, z, 1.2, 1.2, 0.95);
+  }
+
+  function domesticArchitecture(site, data, livingX, livingZ, tableX, tableZ) {
+    const { width, depth, height } = data;
+    const halfW = width / 2,
+      halfD = depth / 2;
+    const bedroomX = site.id === "apartamento" ? -4.3 : -halfW + 4;
+    const roomWidth = Math.min(6.4, halfW - 0.5);
+    // A change in flooring, coffered ceiling and an open oak screen define
+    // furnished rooms without adding invisible walls to the six-metre aisle.
+    box(
+      site.detail,
+      m.oak,
+      -halfW + roomWidth / 2 + 0.15,
+      0.083,
+      -halfD / 2,
+      roomWidth,
+      0.008,
+      halfD - 0.25,
+    );
+    box(
+      site.detail,
+      m.oak,
+      -halfW + roomWidth / 2 + 0.15,
+      0.083,
+      halfD / 2,
+      roomWidth,
+      0.008,
+      halfD - 0.25,
+    );
+    for (const side of [-1, 1]) {
+      box(
+        site.detail,
+        m.white,
+        side * (halfW - 0.17),
+        0.15,
+        0,
+        0.065,
+        0.14,
+        depth - 0.28,
+      );
+      box(
+        site.detail,
+        m.white,
+        side * (halfW - 0.17),
+        height - 0.16,
+        0,
+        0.12,
+        0.16,
+        depth - 0.28,
+      );
+      box(
+        site.detail,
+        m.white,
+        side * ((halfW + 3) / 2),
+        0.15,
+        halfD - 0.17,
+        halfW - 3,
+        0.14,
+        0.065,
+      );
+      box(
+        site.detail,
+        m.oak,
+        (side * halfW) / 2,
+        height - 0.24,
+        0,
+        halfW,
+        0.24,
+        0.2,
+      );
+      const curtainX = side * (halfW - 0.25);
+      instance(
+        site.detail,
+        railGeometry,
+        m.brass,
+        curtainX,
+        2.82,
+        -1,
+        0.022,
+        0.022,
+        3.9,
+      );
+      for (const end of [-2.55, 0.55])
+        for (let fold = 0; fold < 6; fold++) {
+          const dz = end + (fold - 2.5) * 0.083;
+          cylinder(
+            site.detail,
+            m.linen,
+            curtainX + Math.sin(fold * 1.1) * 0.018,
+            1.57,
+            dz,
+            0.065,
+            2.4,
+          );
+        }
+    }
+    box(
+      site.detail,
+      m.white,
+      0,
+      0.15,
+      -halfD + 0.17,
+      width - 0.28,
+      0.14,
+      0.065,
+    );
+    box(
+      site.detail,
+      m.white,
+      0,
+      height - 0.16,
+      -halfD + 0.17,
+      width - 0.28,
+      0.16,
+      0.12,
+    );
+    box(site.detail, m.metal, 0, height - 0.46, halfD - 0.06, 6.1, 0.045, 0.07);
+    box(site.detail, m.metal, 0, 0.092, halfD - 0.06, 6.1, 0.01, 0.08);
+    // The room divider is wholly above the existing sofa footprint.
+    for (let slat = -5; slat <= 5; slat++)
+      box(
+        site.detail,
+        m.oak,
+        livingX + slat * 0.235,
+        1.64,
+        livingZ - 0.45,
+        0.055,
+        2.55,
+        0.08,
+      );
+    box(
+      site.detail,
+      m.darkWood,
+      livingX,
+      2.95,
+      livingZ - 0.45,
+      2.65,
+      0.09,
+      0.1,
+    );
+    pendant(site.detail, livingX, livingZ + 1.55, height, 1.2);
+    for (const dx of [-0.52, 0.52])
+      pendant(site.detail, tableX + dx, tableZ, height, 0.72);
+    rug(site.detail, 0, halfD - 1.15, 2.9, 1.45);
+    rug(site.detail, bedroomX + 0.07, -4.5, 3.1, 3.35);
+    // Framed landscapes, wall mouldings and layered cushions give each view
+    // several real-world scales instead of a few objects on an empty plane.
+    picture(
+      site.detail,
+      bedroomX,
+      2.14,
+      -5.99,
+      1.62,
+      0.75,
+      site.id === "casa-jardim" ? 1 : 0,
+    );
+    if (site.id !== "apartamento")
+      picture(site.detail, halfW - 0.21, 1.9, 3.5, 2.6, 1.35, 1, -Math.PI / 2);
+    // Full-height storage anchors the bedroom; in the larger homes a kitchen
+    // island divides cooking from dining. These five permanent footprints are
+    // well outside the central aisle and never depend on furniture upgrades.
+    const wardrobeSide = site.id === "apartamento" ? 1 : -1;
+    const wardrobeX = wardrobeSide * (halfW - 0.6),
+      wardrobeZ = -4.8;
+    box(site.detail, m.cream, wardrobeX, 1.46, wardrobeZ, 0.78, 2.8, 3.1);
+    const wardrobeFront = wardrobeX - wardrobeSide * 0.41;
+    for (let door = 0; door < 4; door++) {
+      const doorZ = wardrobeZ - 1.15 + door * 0.765;
+      box(site.detail, m.oak, wardrobeFront, 1.47, doorZ, 0.035, 2.65, 0.73);
+      box(
+        site.detail,
+        m.brass,
+        wardrobeFront - wardrobeSide * 0.025,
+        1.4,
+        doorZ + 0.22,
+        0.03,
+        0.4,
+        0.02,
+      );
+    }
+    box(site.detail, m.darkWood, wardrobeX, 0.12, wardrobeZ, 0.8, 0.1, 3.13);
+    collider(site, wardrobeX, wardrobeZ, 0.84, 3.18, 2.9);
+    if (site.id !== "apartamento") {
+      const islandX = halfW - 4.1,
+        islandZ = -1.75;
+      box(site.detail, m.oak, islandX, 0.51, islandZ, 2.5, 0.9, 0.94, 0, true);
+      box(
+        site.detail,
+        m.concrete,
+        islandX,
+        1.01,
+        islandZ,
+        2.68,
+        0.1,
+        1.08,
+        0,
+        true,
+      );
+      box(site.detail, m.darkWood, islandX, 0.15, islandZ, 2.35, 0.12, 0.82);
+      for (const dx of [-0.8, 0, 0.8]) {
+        box(
+          site.detail,
+          m.cream,
+          islandX + dx,
+          0.51,
+          islandZ + 0.49,
+          0.76,
+          0.74,
+          0.025,
+        );
+        box(
+          site.detail,
+          m.brass,
+          islandX + dx,
+          0.78,
+          islandZ + 0.515,
+          0.19,
+          0.025,
+          0.03,
+        );
+      }
+      cylinder(site.detail, m.cream, islandX - 0.45, 1.12, islandZ, 0.21, 0.1);
+      for (let fruit = 0; fruit < 4; fruit++)
+        instance(
+          site.detail,
+          sphereGeometry,
+          m.red,
+          islandX - 0.45 + Math.sin(fruit * 1.57) * 0.11,
+          1.2,
+          islandZ + Math.cos(fruit * 1.57) * 0.1,
+          0.067,
+          0.06,
+          0.067,
+        );
+      box(
+        site.detail,
+        m.linen,
+        islandX + 0.7,
+        1.075,
+        islandZ + 0.12,
+        0.32,
+        0.015,
+        0.49,
+        0.15,
+      );
+      collider(site, islandX, islandZ, 2.72, 1.12, 1.1);
+    }
+    for (const side of [-1, 1]) {
+      const plateX = tableX + side * 0.48;
+      box(site.detail, m.linen, plateX, 0.85, tableZ, 0.58, 0.012, 0.78);
+      cylinder(site.detail, m.white, plateX, 0.867, tableZ, 0.19, 0.018);
+      cylinder(site.detail, m.cream, plateX, 0.88, tableZ, 0.145, 0.008);
+      cylinder(
+        site.detail,
+        m.glass,
+        plateX + 0.22,
+        0.95,
+        tableZ - side * 0.29,
+        0.048,
+        0.19,
+      );
+      box(
+        site.detail,
+        m.metal,
+        plateX - 0.23,
+        0.86,
+        tableZ,
+        0.018,
+        0.008,
+        0.24,
+      );
+    }
+    // These small pieces use the original coffee-table collision footprint.
+    box(
+      site.detail,
+      m.white,
+      livingX - 0.18,
+      0.503,
+      livingZ + 1.67,
+      0.36,
+      0.025,
+      0.25,
+      0.15,
+    );
+    box(
+      site.detail,
+      m.blue,
+      livingX - 0.18,
+      0.519,
+      livingZ + 1.67,
+      0.37,
+      0.008,
+      0.25,
+      0.15,
+    );
+    cylinder(
+      site.detail,
+      m.white,
+      livingX + 0.35,
+      0.56,
+      livingZ + 1.65,
+      0.065,
+      0.12,
+    );
+    cylinder(
+      site.detail,
+      m.dark,
+      livingX + 0.35,
+      0.626,
+      livingZ + 1.65,
+      0.049,
+      0.007,
+    );
+  }
+
   function home(siteData) {
     const data = HOME_DATA[siteData.id],
       site = siteGroup(siteData),
@@ -603,31 +1308,44 @@ export function createEstates(scene, world, quality = "medium") {
     // Empty TV cabinet/desk are base furniture; later decorations reuse them.
     const cabinetX = livingX,
       cabinetZ = Math.min(halfD - 0.8, livingZ + 3.3);
-    box(site.detail, m.wood, cabinetX, 0.4, cabinetZ, 2.5, 0.7, 0.48, 0, true);
+    box(site.detail, m.wood, cabinetX, 0.73, cabinetZ, 2.5, 0.1, 0.48, 0, true);
+    box(site.detail, m.wood, cabinetX, 0.14, cabinetZ, 2.5, 0.1, 0.48, 0, true);
+    box(
+      site.detail,
+      m.darkWood,
+      cabinetX,
+      0.43,
+      cabinetZ + 0.21,
+      2.4,
+      0.5,
+      0.035,
+    );
+    for (const dx of [-1.2, 0.35, 1.2])
+      box(site.detail, m.wood, cabinetX + dx, 0.43, cabinetZ, 0.07, 0.52, 0.46);
     collider(site, cabinetX, cabinetZ, 2.6, 0.6, 0.8);
     box(site.detail, m.white, halfW - 0.3, 1.6, -halfD + 1.4, 0.06, 2.4, 1.5);
     box(site.detail, m.light, 0, height - 0.35, 0, 0.68, 0.1, 0.68, 0, true);
     cylinder(site.detail, m.metal, 0, height - 0.14, 0, 0.02, 0.3);
+    domesticArchitecture(site, data, livingX, livingZ, tableX, tableZ);
+    loungeChair(site, -halfW + 1.1, livingZ + 1.7, 1.25);
+    if (!low) {
+      const pose = site.chairPose;
+      site.detailedChair = createDetailedChair();
+      site.detailedChair.name = "comfort-upgrade-detailed-lounge-chair";
+      site.detailedChair.position.set(pose.x, pose.y, pose.z);
+      site.detailedChair.rotation.y = pose.yaw;
+      site.detailedChair.visible = false;
+      site.detail.add(site.detailedChair);
+    }
     // Upgrade 1: rugs and original framed art.
-    box(
-      site.upgrades[0],
-      m.cloth,
-      livingX,
-      0.091,
-      livingZ + 1.2,
-      3.7,
-      0.015,
-      3.2,
-    );
-    box(site.upgrades[0], m.darkWood, 0, 1.8, -halfD + 0.19, 2.8, 1.35, 0.1);
-    box(site.upgrades[0], m.blue, -0.5, 1.8, -halfD + 0.26, 1.2, 1.15, 0.035);
-    box(site.upgrades[0], m.red, 0.75, 1.8, -halfD + 0.27, 0.9, 1.15, 0.035);
+    rug(site.upgrades[0], livingX, livingZ + 1.2, 3.7, 3.2, true);
+    picture(site.upgrades[0], 0, 1.9, -halfD + 0.19, 2.8, 1.35, 1);
     // Upgrade 2: entertainment and a stocked bookshelf.
     box(
       site.upgrades[1],
       m.screen,
       cabinetX,
-      1.25,
+      1.45,
       cabinetZ,
       2.15,
       1.17,
@@ -652,6 +1370,9 @@ export function createEstates(scene, world, quality = "medium") {
     plant(site.upgrades[2], tableX, tableZ, 0.43, 0.85);
     const bedsideX = (roomy ? -halfW + 4 : -4.3) - 1.35;
     box(site.detail, m.wood, bedsideX, 0.32, -5.6, 0.55, 0.57, 0.6, 0, true);
+    box(site.detail, m.darkWood, bedsideX, 0.37, -5.29, 0.46, 0.018, 0.025);
+    box(site.detail, m.brass, bedsideX, 0.45, -5.27, 0.11, 0.025, 0.03);
+    box(site.detail, m.linen, bedsideX, 0.626, -5.58, 0.29, 0.025, 0.22, 0.06);
     collider(site, bedsideX, -5.6, 0.6, 0.65, 0.7);
     cylinder(site.upgrades[2], m.brass, bedsideX, 0.84, -5.6, 0.025, 0.48);
     cylinder(site.upgrades[2], m.light, bedsideX, 1.05, -5.6, 0.22, 0.3);
@@ -952,6 +1673,9 @@ export function createEstates(scene, world, quality = "medium") {
       site.upgrades.forEach((upgrade, index) => {
         upgrade.visible = site.level >= index + 1;
       });
+      const useDetailedChair = !!site.detailedChair && site.level >= 3;
+      if (site.basicChair) site.basicChair.visible = !useDetailedChair;
+      if (site.detailedChair) site.detailedChair.visible = useDetailedChair;
       site.sign?.draw(
         site.name.toUpperCase(),
         owned
@@ -965,6 +1689,13 @@ export function createEstates(scene, world, quality = "medium") {
   function update(_dt = 0, playerPosition, company) {
     if (disposed) return;
     if (company) updateOwnership(company);
+    // A small paint bounce replaces the missing indoor diffuse GI on downward
+    // ceiling normals; it follows the environment and therefore dims at night.
+    const daylight = Math.min(
+      1,
+      Math.max(0, (scene.environmentIntensity ?? 0.44) / 0.44),
+    );
+    m.ceiling.emissiveIntensity = 0.025 + daylight * 0.245;
     const px = Number.isFinite(playerPosition?.x) ? playerPosition.x : 0,
       pz = Number.isFinite(playerPosition?.z) ? playerPosition.z : 86;
     for (const site of sites) {
@@ -1002,6 +1733,9 @@ export function createEstates(scene, world, quality = "medium") {
     if (disposed) return;
     disposed = true;
     showroom.forEach(({ actor }) => disposeActor(actor));
+    sites.forEach((site) => {
+      if (site.detailedChair) disposeActor({ group: site.detailedChair });
+    });
     group.removeFromParent();
     geometries.forEach((value) => value.dispose());
     materials.forEach((value) => value.dispose());

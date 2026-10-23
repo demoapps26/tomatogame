@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import * as Actors from "./actors.js";
+import { createPassengerVehicle } from "./passenger-vehicles.js";
 
 const TAU = Math.PI * 2;
 const palette = [
@@ -131,7 +132,7 @@ function roadFallback(world) {
 /** Ambient life owns its actors only; the caller owns lights, world and player. */
 export function createCityLife(scene, world, quality = "medium") {
   const counts =
-    quality === "high" ? [7, 14] : quality === "low" ? [3, 5] : [4, 8];
+    quality === "high" ? [10, 20] : quality === "low" ? [3, 5] : [6, 10];
   const sourceRoads =
     Array.isArray(world.trafficRoutes) && world.trafficRoutes.length
       ? world.trafficRoutes
@@ -299,7 +300,13 @@ export function createCityLife(scene, world, quality = "medium") {
 
   for (let index = 0; index < counts[0] && roadRoutes.length; index++) {
     const route = roadRoutes[index % roadRoutes.length];
-    const actor = Actors.createVehicle(palette[index % palette.length]);
+    const modelId = ["compact", "pickup", "suv", "compact", "van", "compact"][
+      index % 6
+    ];
+    const actor = createPassengerVehicle(
+      modelId,
+      palette[index % palette.length],
+    );
     const vehicle = {
       actor,
       position: actor.group.position,
@@ -311,8 +318,10 @@ export function createCityLife(scene, world, quality = "medium") {
       lane: 1.85,
       route,
       ambient: true,
-      radius: 1.2,
-      length: 4.6,
+      modelId,
+      bounds: actor.bounds,
+      radius: (actor.bounds?.width || 2.3) / 2 + 0.03,
+      length: actor.bounds?.length || 4.6,
       blockedTime: 0,
       visible: true,
     };

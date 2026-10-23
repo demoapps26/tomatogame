@@ -42,6 +42,15 @@ import {
 } from "./driving-jobs.js";
 import { createRaceCourse } from "./race-course.js";
 import { createCityMapPanel } from "./city-map-panel.js";
+import {
+  detailedVehicleAssetsReady,
+  getDetailedVehicleState,
+} from "./vehicle-asset.js";
+import {
+  furnitureAssetsReady,
+  getFurnitureAssetState,
+} from "./furniture-asset.js";
+import { createVehicleReflections } from "./vehicle-reflections.js";
 
 const $ = (id) => document.getElementById(id);
 const canvas = $("view");
@@ -96,6 +105,7 @@ const camera = new THREE.PerspectiveCamera(
   2200,
 );
 const visuals = createVisuals(renderer, scene, camera, settings.quality);
+const vehicleReflections = createVehicleReflections(renderer, scene);
 let savedCampaign = null;
 try {
   const data = JSON.parse(
@@ -784,6 +794,7 @@ function makeMarker() {
   markerBeam = tip;
 }
 function resetMap(id) {
+  vehicleReflections.reset();
   if (world) flushVehicleUsage(true);
   if (atmosphere) atmosphereState = atmosphere.getState();
   if (initialized && trials.active) trials = cancelTrial(trials).state;
@@ -855,13 +866,19 @@ function resetMap(id) {
   cooldown = 0;
   const colors = [0xcf5538, 0x8baf9f, 0xe0c38a, 0x384e61, 0xc5d0bb];
   world.vehicleSpawns.slice(0, 5).forEach((spawn, index) => {
-    const actor = createVehicle(colors[index % colors.length]);
+    const modelId = index === 0 ? "sport" : "pickup";
+    const actor = createPassengerVehicle(
+      modelId,
+      colors[index % colors.length],
+    );
     actor.group.position.copy(safePosition(spawn.x, spawn.z));
     actor.group.rotation.y = spawn.yaw || 0;
     scene.add(actor.group);
     cars.push({
       actor,
       position: actor.group.position,
+      modelId,
+      bounds: actor.bounds,
       yaw: spawn.yaw || 0,
       speed: 0,
       steering: 0,
@@ -1273,6 +1290,32 @@ function updateHud() {
   if ($("world-clock") && atmosphere) {
     const sky = atmosphere.getState();
     $("world-clock").textContent = `${sky.clock} · ${sky.label}`;
+  }
+}
+const DRIVER_SEATS = {
+  sport: { x: 0, y: -0.53, z: 0.15, scale: 0.9 },
+  compact: { x: -0.4, y: 0.08, z: -0.05, scale: 0.78 },
+  pickup: { x: -0.42, y: 0.53, z: 0.29, scale: 0.72 },
+  suv: { x: -0.46, y: 0.005, z: 0.16, scale: 1 },
+  van: { x: -0.46, y: 0.025, z: 0.75, scale: 1 },
+};
+function updateVehicleDrivers() {
+  for (const car of cars) {
+    const active = car === player.vehicle;
+    if (active && !car.driver) {
+      const actor = createCharacter();
+      const seat = DRIVER_SEATS[car.modelId] || DRIVER_SEATS.pickup;
+      actor.group.position.set(seat.x, seat.y, seat.z);
+      actor.group.scale.setScalar(seat.scale);
+      actor.group.name = "player-seated-driver";
+      car.actor.group.add(actor.group);
+      car.driver = actor;
+    }
+    if (car.driver) {
+      const supported = typeof car.driver.setDrivingPose === "function";
+      car.driver.group.visible = active && supported;
+      if (active && supported) car.driver.setDrivingPose(car.steering || 0);
+    }
   }
 }
 function updatePlayer(dt) {
@@ -1827,6 +1870,7 @@ function update(dt) {
   }
   if (fireHeld) shoot();
   updatePlayer(dt);
+  updateVehicleDrivers();
   vehicleUsageTime += dt;
   if (vehicleUsageTime >= 1) {
     flushVehicleUsage();
@@ -2126,6 +2170,7 @@ $("sensitivity").value = settings.sensitivity;
 $("quality").addEventListener("change", () => {
   settings.quality = $("quality").value;
   visuals.setQuality(settings.quality);
+  vehicleReflections.reset();
   resize();
   Promise.resolve(visuals.ready).then(() => {
     renderDirty = true;
@@ -2382,6 +2427,7 @@ if (savedCampaign) {
     player.vehicle = savedDriver;
     player.position.copy(player.vehicle.position);
     player.actor.group.visible = false;
+    updateVehicleDrivers();
   }
   player.health = THREE.MathUtils.clamp(
     Number(savedCampaign.health) || 100,
@@ -2416,6 +2462,8 @@ if (new URLSearchParams(location.search).has("diagnostics")) {
         Promise.all([
           photoAssetsReady(),
           scannedHeadsReady(),
+          detailedVehicleAssetsReady(),
+          furnitureAssetsReady(),
           visuals.ready,
         ]).then(() => getPhotoAssetState()),
       snapshot: () => ({
@@ -2438,6 +2486,7 @@ if (new URLSearchParams(location.search).has("diagnostics")) {
               speed: player.vehicle.speed,
               ownershipId: player.vehicle.ownershipId || null,
               modelId: player.vehicle.modelId || "pickup",
+              driverVisible: !!player.vehicle.driver?.group.visible,
             }
           : null,
         enemies: enemies.map((e) => ({
@@ -2455,7 +2504,7 @@ if (new URLSearchParams(location.search).has("diagnostics")) {
           yaw: car.yaw,
           ownershipId: car.ownershipId || null,
           modelId: car.modelId || "pickup",
-          bounds: car.bounds,
+          bounds: car.bounds ? { ...car.bounds } : null,
         })),
         founded,
         activeContractId,
@@ -2497,6 +2546,16 @@ if (new URLSearchParams(location.search).has("diagnostics")) {
           quality: settings.quality,
           photographicAssets: getPhotoAssetState(),
           scannedHead: getScannedHeadState(),
+          detailedVehicle: getDetailedVehicleState(),
+          vehicleReflections: vehicleReflections.getState(),
+          furniture: getFurnitureAssetState(),
+          urbanDetail: world.urbanStats ? { ...world.urbanStats } : null,
+          vegetation: world.vegetationStats
+            ? {
+                ...world.vegetationStats,
+                species: { ...world.vegetationStats.species },
+              }
+            : null,
           calls: renderer.info.render.calls,
           triangles: renderer.info.render.triangles,
         },
@@ -2515,11 +2574,19 @@ function frame(now) {
   } else if (!renderDirty) return;
   if (!started) cameraUpdate(dt);
   visuals.update(dt, player.position, company.day);
+  if (state === "playing" && !transitioning)
+    vehicleReflections.update(dt, player.vehicle, settings.quality);
   visuals.render();
   renderDirty = false;
 }
 requestAnimationFrame(frame);
-Promise.all([photoAssetsReady(), scannedHeadsReady(), visuals.ready])
+Promise.all([
+  photoAssetsReady(),
+  scannedHeadsReady(),
+  detailedVehicleAssetsReady(),
+  furnitureAssetsReady(),
+  visuals.ready,
+])
   .then(() => {
     renderDirty = true;
   })
